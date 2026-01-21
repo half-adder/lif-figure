@@ -10,6 +10,9 @@ import yaml
 DEFAULT_COLORS = ["blue", "green", "red"]
 
 
+DEFAULT_AUTO_CONTRAST_PERCENTILES = (0.1, 99.9)
+
+
 @dataclass
 class Config:
     """Configuration for figure generation."""
@@ -20,6 +23,7 @@ class Config:
     font_size: int = 12
     scale_bar_height: int = 4
     background: str = "black"
+    auto_contrast_percentiles: Optional[tuple[float, float]] = None
 
     def get_color(self, channel_name: str, index: int) -> str:
         """Get color for a channel, checking overrides first."""
@@ -43,10 +47,18 @@ def load_config(config_path: Optional[Path]) -> Config:
 
     color_overrides = data.get("colors", {})
 
+    # Parse auto_contrast_percentiles from config if present
+    auto_contrast_percentiles = None
+    if "auto_contrast_percentiles" in data:
+        pct = data["auto_contrast_percentiles"]
+        if isinstance(pct, list) and len(pct) == 2:
+            auto_contrast_percentiles = (float(pct[0]), float(pct[1]))
+
     return Config(
         color_overrides=color_overrides,
         dpi=data.get("dpi", 300),
         font_size=data.get("font_size", 12),
         scale_bar_height=data.get("scale_bar_height", 4),
         background=data.get("background", "black"),
+        auto_contrast_percentiles=auto_contrast_percentiles,
     )

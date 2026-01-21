@@ -22,23 +22,35 @@ COLOR_MAP = {
 }
 
 
-def normalize_channel(data: np.ndarray) -> np.ndarray:
+def normalize_channel(
+    data: np.ndarray,
+    percentiles: Optional[tuple[float, float]] = None,
+) -> np.ndarray:
     """Normalize channel data to 0-1 range.
 
     Args:
         data: 2D array of pixel values
+        percentiles: Optional (low, high) percentiles for auto-contrast.
+                     If provided, clips to these percentiles before normalizing.
+                     E.g., (0.1, 99.9) clips extreme 0.1% on each end.
 
     Returns:
         Normalized array with values in [0, 1]
     """
     data = data.astype(np.float64)
-    min_val = data.min()
-    max_val = data.max()
+
+    if percentiles is not None:
+        min_val = np.percentile(data, percentiles[0])
+        max_val = np.percentile(data, percentiles[1])
+    else:
+        min_val = data.min()
+        max_val = data.max()
 
     if max_val == min_val:
         return np.zeros_like(data)
 
-    return (data - min_val) / (max_val - min_val)
+    normalized = (data - min_val) / (max_val - min_val)
+    return np.clip(normalized, 0, 1)
 
 
 def apply_colormap(data: np.ndarray, color: str) -> np.ndarray:
@@ -124,7 +136,10 @@ def build_figure(
     n_panels = n_channels + 1  # channels + merge
 
     # Normalize all channels
-    normalized = [normalize_channel(channels[i]) for i in range(n_channels)]
+    normalized = [
+        normalize_channel(channels[i], config.auto_contrast_percentiles)
+        for i in range(n_channels)
+    ]
 
     # Apply colors
     colors = [config.get_color(names[i], i) for i in range(n_channels)]

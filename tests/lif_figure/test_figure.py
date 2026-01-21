@@ -33,6 +33,36 @@ def test_normalize_channel_handles_constant():
     assert np.all(result == 0.0)  # or 1.0, just no NaN
 
 
+def test_normalize_channel_with_percentiles():
+    """normalize_channel with percentiles should clip outliers."""
+    # Array with outliers: 0, 1-98, 1000 (100 values total)
+    data = np.array([0] + list(range(1, 99)) + [1000], dtype=np.float64).reshape(10, 10)
+
+    # Without percentiles: 0 maps to 0, 1000 maps to 1
+    result_minmax = normalize_channel(data)
+    assert result_minmax.min() == 0.0
+    assert result_minmax.max() == 1.0
+    # Middle values get compressed
+    assert result_minmax.flat[50] < 0.1  # value 50 out of 1000
+
+    # With percentiles (5, 95): clips bottom 5% and top 5%
+    result_pct = normalize_channel(data, percentiles=(5.0, 95.0))
+    # Now middle values should use more of the range
+    assert result_pct.flat[50] > 0.3  # value 50 now has more room
+
+
+def test_normalize_channel_with_percentiles_clips():
+    """normalize_channel with percentiles should clip to 0-1."""
+    data = np.array([[0, 50, 100, 150, 200]], dtype=np.float64)
+
+    # Clip to 25th-75th percentile
+    result = normalize_channel(data, percentiles=(25.0, 75.0))
+
+    # Values outside the percentile range should be clipped
+    assert result.min() >= 0.0
+    assert result.max() <= 1.0
+
+
 def test_apply_colormap_gray():
     """apply_colormap should create RGB from grayscale."""
     data = np.array([[0.0, 0.5], [1.0, 0.25]])

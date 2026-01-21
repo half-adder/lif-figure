@@ -8,7 +8,7 @@ from typing import Optional
 import click
 import matplotlib.pyplot as plt
 
-from lif_figure.config import load_config
+from lif_figure.config import load_config, DEFAULT_AUTO_CONTRAST_PERCENTILES
 from lif_figure.reader import list_series, read_series
 from lif_figure.figure import build_figure
 
@@ -47,6 +47,14 @@ def sanitize_filename(name: str) -> str:
     type=click.Path(exists=True),
     help="Optional YAML config file",
 )
+@click.option(
+    "--auto-contrast", "-a",
+    "auto_contrast",
+    default=None,
+    is_flag=False,
+    flag_value="default",
+    help="Enable auto-contrast (optional: LOW,HIGH percentiles, e.g., '0.5,99.5')",
+)
 def main(
     input_file: str,
     channels: str,
@@ -54,6 +62,7 @@ def main(
     output: str,
     zstack: str,
     config: Optional[str],
+    auto_contrast: Optional[str],
 ) -> None:
     """Generate publication-ready figure panels from LIF files.
 
@@ -83,6 +92,24 @@ def main(
         auto_config = Path("lif-figure.yaml")
         if auto_config.exists():
             cfg = load_config(auto_config)
+
+    # Handle auto-contrast flag
+    if auto_contrast is not None:
+        if auto_contrast == "default":
+            # Use config file value or defaults
+            if cfg.auto_contrast_percentiles is None:
+                cfg.auto_contrast_percentiles = DEFAULT_AUTO_CONTRAST_PERCENTILES
+        else:
+            # Parse custom percentiles
+            try:
+                parts = auto_contrast.split(",")
+                if len(parts) != 2:
+                    raise ValueError("Expected two values")
+                cfg.auto_contrast_percentiles = (float(parts[0]), float(parts[1]))
+            except ValueError:
+                click.echo(f"Error: Invalid auto-contrast format: '{auto_contrast}'", err=True)
+                click.echo("Expected format: LOW,HIGH (e.g., '0.5,99.5')", err=True)
+                sys.exit(1)
 
     # Get series to process
     all_series = list_series(input_path)

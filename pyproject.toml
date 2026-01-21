@@ -19,6 +19,8 @@ dependencies = [
     "pyyaml",
     "readlif",
     "qtpy",
+    "click>=8.0",
+    "matplotlib>=3.5",
 ]
 
 [project.optional-dependencies]
@@ -30,10 +32,15 @@ dev = [
 [project.entry-points."napari.manifest"]
 napari-figure-maker = "napari_figure_maker:napari.yaml"
 
+[project.scripts]
+lif-figure = "lif_figure.cli:main"
+
 [tool.hatch.build.targets.wheel]
-packages = ["src/napari_figure_maker"]
+packages = ["src/napari_figure_maker", "src/lif_figure"]
 
 [dependency-groups]
 dev = [
     "pyqt6>=6.10.2",
+    "pytest>=9.0.2",
+    "pytest-qt>=4.5.0",
 ]

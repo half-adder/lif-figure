@@ -32,3 +32,8 @@ napari-figure-maker = "napari_figure_maker:napari.yaml"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/napari_figure_maker"]
+
+[dependency-groups]
+dev = [
+    "pyqt6>=6.10.2",
+]

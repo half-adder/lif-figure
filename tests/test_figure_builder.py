@@ -6,6 +6,7 @@ from napari_figure_maker.figure_builder import (
     render_channel_to_rgb,
     create_merge_composite,
     arrange_panels_in_grid,
+    add_label_to_panel,
 )
 
 
@@ -132,3 +133,23 @@ def test_arrange_panels_with_gap():
     assert result.shape == (100, 210, 3)
     # Gap should be white (background)
     assert result[50, 105, 0] == 255
+
+
+def test_add_label_to_panel():
+    """Should add text label to panel."""
+    panel = np.zeros((100, 100, 3), dtype=np.uint8)
+
+    labeled = add_label_to_panel(
+        panel=panel,
+        label="DAPI",
+        position="top-left",
+        font_size=12,
+        color="white",
+    )
+
+    assert isinstance(labeled, np.ndarray)
+    assert labeled.shape == panel.shape
+    # Top-left corner should no longer be pure black (has text)
+    # Check a small region where text should be
+    top_left_region = labeled[5:20, 5:50]
+    assert top_left_region.max() > 0  # Some white pixels from text

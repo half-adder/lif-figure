@@ -130,3 +130,57 @@ def arrange_panels_in_grid(
         grid[y:y + panel_height, x:x + panel_width] = panel
 
     return grid
+
+
+def add_label_to_panel(
+    panel: np.ndarray,
+    label: str,
+    position: str = "top-left",
+    font_size: int = 12,
+    color: str = "white",
+    padding: int = 5,
+) -> np.ndarray:
+    """Add a text label to a panel image.
+
+    Args:
+        panel: RGB numpy array.
+        label: Text to add.
+        position: Where to place label ("top-left", "top-center", "bottom-left").
+        font_size: Font size in pixels.
+        color: Text color.
+        padding: Padding from edge in pixels.
+
+    Returns:
+        New RGB numpy array with label added.
+    """
+    # Convert to PIL for text rendering
+    img = Image.fromarray(panel)
+    draw = ImageDraw.Draw(img)
+
+    # Try to load font
+    try:
+        font = ImageFont.truetype("Arial", font_size)
+    except (OSError, IOError):
+        font = ImageFont.load_default()
+
+    # Get text size
+    text_bbox = draw.textbbox((0, 0), label, font=font)
+    text_width = text_bbox[2] - text_bbox[0]
+    text_height = text_bbox[3] - text_bbox[1]
+
+    # Calculate position
+    if position == "top-left":
+        x, y = padding, padding
+    elif position == "top-center":
+        x = (panel.shape[1] - text_width) // 2
+        y = padding
+    elif position == "bottom-left":
+        x = padding
+        y = panel.shape[0] - text_height - padding
+    else:
+        x, y = padding, padding
+
+    # Draw text
+    draw.text((x, y), label, fill=color, font=font)
+
+    return np.array(img)

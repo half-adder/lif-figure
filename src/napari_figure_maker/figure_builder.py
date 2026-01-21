@@ -75,3 +75,58 @@ def create_merge_composite(channels: List[np.ndarray]) -> np.ndarray:
 
     # Clip and convert back to uint8
     return np.clip(merged, 0, 255).astype(np.uint8)
+
+
+def arrange_panels_in_grid(
+    panels: List[np.ndarray],
+    gap_fraction: float = 0.02,
+    background_color: str = "black",
+    columns: Optional[int] = None,
+) -> np.ndarray:
+    """Arrange panel images in a grid layout.
+
+    Args:
+        panels: List of RGB numpy arrays, all same shape.
+        gap_fraction: Gap between panels as fraction of panel width.
+        background_color: Background color for gaps ("black" or "white").
+        columns: Number of columns. None = single row.
+
+    Returns:
+        RGB numpy array of the complete grid.
+    """
+    if not panels:
+        raise ValueError("At least one panel required")
+
+    panel_height, panel_width = panels[0].shape[:2]
+    n_panels = len(panels)
+
+    # Calculate grid dimensions
+    if columns is None:
+        n_cols = n_panels
+        n_rows = 1
+    else:
+        n_cols = columns
+        n_rows = (n_panels + columns - 1) // columns
+
+    # Calculate gap in pixels
+    gap_px = int(panel_width * gap_fraction)
+
+    # Calculate total dimensions
+    total_width = n_cols * panel_width + (n_cols - 1) * gap_px
+    total_height = n_rows * panel_height + (n_rows - 1) * gap_px
+
+    # Create background
+    bg_value = 255 if background_color == "white" else 0
+    grid = np.full((total_height, total_width, 3), bg_value, dtype=np.uint8)
+
+    # Place panels
+    for i, panel in enumerate(panels):
+        row = i // n_cols
+        col = i % n_cols
+
+        y = row * (panel_height + gap_px)
+        x = col * (panel_width + gap_px)
+
+        grid[y:y + panel_height, x:x + panel_width] = panel
+
+    return grid

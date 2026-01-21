@@ -28,7 +28,7 @@ def extract_series_metadata(lif: LifFile, series_name: str) -> SeriesMetadata:
 
     Args:
         lif: LifFile object
-        series_name: Name of the series
+        series_name: Name of the series (may include collection path like "Collection/Series001")
 
     Returns:
         SeriesMetadata with laser and detector info
@@ -36,9 +36,13 @@ def extract_series_metadata(lif: LifFile, series_name: str) -> SeriesMetadata:
     metadata = SeriesMetadata()
     root = lif.xml_root
 
+    # Extract just the series name without collection path for XML matching
+    # e.g., "New collection001/Series001" -> "Series001"
+    xml_series_name = series_name.split('/')[-1] if '/' in series_name else series_name
+
     # Find the series Element
     for elem in root.iter('Element'):
-        if elem.get('Name') == series_name:
+        if elem.get('Name') == xml_series_name:
             # Find HardwareSetting attachment
             for attachment in elem.iter('Attachment'):
                 if attachment.get('Name') == 'HardwareSetting':

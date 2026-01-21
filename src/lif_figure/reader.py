@@ -1,10 +1,93 @@
 """LIF file reading and Z-stack processing."""
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
 import numpy as np
 from readlif.reader import LifFile
+
+
+@dataclass
+class DetectorInfo:
+    """Information about a detector channel."""
+    name: str
+    mode: str  # "Std" or "PC" (PhotonCounting)
+    gain: float
+
+
+@dataclass
+class SeriesMetadata:
+    """Acquisition metadata for a series."""
+    lasers: dict[str, float] = field(default_factory=dict)  # wavelength -> power %
+    detectors: list[DetectorInfo] = field(default_factory=list)
+
+
+def extract_series_metadata(lif: LifFile, series_name: str) -> SeriesMetadata:
+    """Extract acquisition metadata for a series from LIF XML.
+
+    Args:
+        lif: LifFile object
+        series_name: Name of the series
+
+    Returns:
+        SeriesMetadata with laser and detector info
+    """
+    metadata = SeriesMetadata()
+    root = lif.xml_root
+
+    # Find the series Element
+    for elem in root.iter('Element'):
+        if elem.get('Name') == series_name:
+            # Find HardwareSetting attachment
+            for attachment in elem.iter('Attachment'):
+                if attachment.get('Name') == 'HardwareSetting':
+                    _extract_lasers(attachment, metadata)
+                    _extract_detectors(attachment, metadata)
+                    break
+            break
+
+    return metadata
+
+
+def _extract_lasers(attachment, metadata: SeriesMetadata) -> None:
+    """Extract active laser settings from HardwareSetting."""
+    # Find AOTF sections with IsChanged="1" (active during acquisition)
+    for aotf in attachment.iter('Aotf'):
+        if aotf.get('IsChanged') == '1':
+            for laser in aotf.iter('LaserLineSetting'):
+                wavelength = laser.get('LaserLine')
+                intensity_str = laser.get('IntensityDev', '0')
+                try:
+                    intensity = float(intensity_str)
+                    if intensity > 0.001 and wavelength:
+                        # Store as percentage, cap display at reasonable max
+                        metadata.lasers[wavelength] = intensity
+                except ValueError:
+                    pass
+
+
+def _extract_detectors(attachment, metadata: SeriesMetadata) -> None:
+    """Extract active detector settings from HardwareSetting."""
+    for detector in attachment.iter('Detector'):
+        if detector.get('IsActive') == '1':
+            # Get detector name (fall back to index-based name)
+            name = detector.get('DetectorName', '').strip()
+            if not name:
+                name = f"HyD{len(metadata.detectors) + 1}"
+
+            # Get acquisition mode
+            mode_name = detector.get('AcquisitionModeName', '')
+            mode = "PC" if mode_name == "PhotonCounting" else "Std"
+
+            # Get gain
+            gain_str = detector.get('Gain', '0')
+            try:
+                gain = float(gain_str)
+            except ValueError:
+                gain = 0.0
+
+            metadata.detectors.append(DetectorInfo(name=name, mode=mode, gain=gain))
 
 
 def parse_zstack_mode(mode_str: str) -> tuple[str, Optional[tuple[int, int]]]:

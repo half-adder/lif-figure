@@ -9,7 +9,7 @@ import click
 import matplotlib.pyplot as plt
 
 from lif_figure.config import load_config, DEFAULT_AUTO_CONTRAST_PERCENTILES
-from lif_figure.reader import list_series, read_series
+from lif_figure.reader import list_series, read_series, extract_series_metadata, LifFile
 from lif_figure.figure import build_figure
 
 
@@ -55,6 +55,12 @@ def sanitize_filename(name: str) -> str:
     flag_value="default",
     help="Enable auto-contrast (optional: LOW,HIGH percentiles, e.g., '0.5,99.5')",
 )
+@click.option(
+    "--no-metadata",
+    is_flag=True,
+    default=False,
+    help="Hide acquisition metadata table from output",
+)
 def main(
     input_file: str,
     channels: str,
@@ -63,6 +69,7 @@ def main(
     zstack: str,
     config: Optional[str],
     auto_contrast: Optional[str],
+    no_metadata: bool,
 ) -> None:
     """Generate publication-ready figure panels from LIF files.
 
@@ -130,12 +137,21 @@ def main(
 
     click.echo(f"Processing {input_path.name}")
 
+    # Open LIF file for metadata extraction
+    lif = LifFile(str(input_path))
+    show_metadata = not no_metadata
+
     # Process each series
     for i, series_name in enumerate(series_names, 1):
         click.echo(f"  Series {i} of {len(series_names)}: \"{series_name}\"", nl=False)
 
         try:
             data, pixel_size_um = read_series(input_path, series_name, zstack)
+
+            # Extract metadata if needed
+            metadata = None
+            if show_metadata:
+                metadata = extract_series_metadata(lif, series_name)
 
             # Validate channel count
             if data.ndim == 3:  # (C, H, W)
@@ -150,7 +166,10 @@ def main(
             # Handle different Z-stack modes
             if data.ndim == 3:
                 # Single figure (max projection)
-                fig = build_figure(data, channel_names, cfg, pixel_size_um)
+                fig = build_figure(
+                    data, channel_names, cfg, pixel_size_um,
+                    metadata=metadata, show_metadata=show_metadata
+                )
 
                 safe_name = sanitize_filename(series_name)
                 output_file = output_path / f"{safe_name}.pdf"
@@ -165,7 +184,10 @@ def main(
                 subdir.mkdir(exist_ok=True)
 
                 for z in range(data.shape[0]):
-                    fig = build_figure(data[z], channel_names, cfg, pixel_size_um)
+                    fig = build_figure(
+                        data[z], channel_names, cfg, pixel_size_um,
+                        metadata=metadata, show_metadata=show_metadata
+                    )
                     output_file = subdir / f"z{z:02d}.pdf"
                     fig.savefig(output_file, format="pdf", bbox_inches="tight", facecolor=cfg.background)
                     plt.close(fig)

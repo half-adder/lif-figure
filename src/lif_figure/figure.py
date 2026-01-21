@@ -1,12 +1,16 @@
 """Matplotlib figure generation for LIF channels."""
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib.gridspec import GridSpec
 
 from lif_figure.config import Config
+
+if TYPE_CHECKING:
+    from lif_figure.reader import SeriesMetadata
 
 
 # Color mappings for simple named colors
@@ -120,6 +124,8 @@ def build_figure(
     names: list[str],
     config: Config,
     pixel_size_um: Optional[float] = None,
+    metadata: Optional["SeriesMetadata"] = None,
+    show_metadata: bool = True,
 ) -> Figure:
     """Build a figure with channel panels and merge.
 
@@ -128,6 +134,8 @@ def build_figure(
         names: List of channel names
         config: Configuration object
         pixel_size_um: Optional pixel size for scale bar
+        metadata: Optional series metadata for table
+        show_metadata: Whether to show metadata table (default True)
 
     Returns:
         Matplotlib Figure object
@@ -148,10 +156,20 @@ def build_figure(
     # Create merge
     merge = create_merge(colored)
 
-    # Create figure
-    fig, axes = plt.subplots(1, n_panels, figsize=(4 * n_panels, 4), dpi=config.dpi)
-    if n_panels == 1:
-        axes = [axes]
+    # Determine figure size and layout
+    should_show_table = show_metadata and metadata is not None
+    if should_show_table:
+        # Use gridspec for images + table
+        fig_height = 5.5  # Extra space for table
+        fig = plt.figure(figsize=(4 * n_panels, fig_height), dpi=config.dpi)
+        gs = GridSpec(2, n_panels, figure=fig, height_ratios=[4, 1], hspace=0.3)
+        axes = [fig.add_subplot(gs[0, i]) for i in range(n_panels)]
+        table_ax = fig.add_subplot(gs[1, :])
+    else:
+        fig, axes = plt.subplots(1, n_panels, figsize=(4 * n_panels, 4), dpi=config.dpi)
+        if n_panels == 1:
+            axes = [axes]
+        table_ax = None
 
     # Set background
     fig.patch.set_facecolor(config.background)
@@ -182,8 +200,84 @@ def build_figure(
     if scale_bar_info:
         _add_scale_bar(ax_merge, scale_bar_info, config)
 
-    plt.tight_layout()
+    # Add metadata table
+    if should_show_table and table_ax is not None:
+        _add_metadata_table(table_ax, names, metadata, config)
+    else:
+        plt.tight_layout()
+
     return fig
+
+
+def _add_metadata_table(
+    ax,
+    channel_names: list[str],
+    metadata: "SeriesMetadata",
+    config: Config,
+) -> None:
+    """Add metadata table below the figure panels."""
+    ax.axis("off")
+    ax.set_facecolor(config.background)
+
+    # Build table data
+    headers = ["Channel", "Laser", "Power", "Detector", "Mode", "Gain", "Contrast"]
+    rows = []
+
+    # Get contrast string
+    if config.auto_contrast_percentiles:
+        contrast_str = f"{config.auto_contrast_percentiles[0]}-{config.auto_contrast_percentiles[1]}%"
+    else:
+        contrast_str = "min-max"
+
+    # Sort laser wavelengths for matching to channels
+    sorted_wavelengths = sorted(metadata.lasers.keys(), key=int)
+
+    for i, name in enumerate(channel_names):
+        # Get laser info (match by index)
+        if i < len(sorted_wavelengths):
+            wl = sorted_wavelengths[i]
+            power = metadata.lasers[wl]
+            laser_str = f"{wl}nm"
+            power_str = f"{power:.0f}%" if power < 100 else f"{power:.1f}%"
+        else:
+            laser_str = "-"
+            power_str = "-"
+
+        # Get detector info
+        if i < len(metadata.detectors):
+            det = metadata.detectors[i]
+            det_name = det.name
+            mode_str = det.mode
+            gain_str = f"{det.gain:.0f}%"
+        else:
+            det_name = "-"
+            mode_str = "-"
+            gain_str = "-"
+
+        rows.append([name, laser_str, power_str, det_name, mode_str, gain_str, contrast_str])
+
+    # Create table
+    text_color = "white" if config.background == "black" else "black"
+    table = ax.table(
+        cellText=rows,
+        colLabels=headers,
+        loc="center",
+        cellLoc="center",
+    )
+
+    # Style the table
+    table.auto_set_font_size(False)
+    table.set_fontsize(config.font_size - 2)
+    table.scale(1, 1.5)  # Make rows taller
+
+    # Style cells
+    for key, cell in table.get_celld().items():
+        cell.set_edgecolor(text_color)
+        cell.set_facecolor(config.background)
+        cell.set_text_props(color=text_color)
+        # Bold header row
+        if key[0] == 0:
+            cell.set_text_props(weight="bold", color=text_color)
 
 
 def _add_scale_bar(ax, scale_bar_info: tuple[int, str], config: Config) -> None:

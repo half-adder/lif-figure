@@ -29,10 +29,14 @@ def test_full_pipeline_with_mock(tmp_path, mock_lif_file, mock_lif_data):
     output_dir = tmp_path / "output"
 
     with patch("lif_figure.cli.list_series") as mock_list, \
-         patch("lif_figure.cli.read_series") as mock_read:
+         patch("lif_figure.cli.read_series") as mock_read, \
+         patch("lif_figure.cli.LifFile") as mock_lif_class, \
+         patch("lif_figure.cli.extract_series_metadata") as mock_metadata:
 
         mock_list.return_value = ["Sample 1", "Sample 2"]
         mock_read.return_value = (mock_lif_data, 0.5)  # pixel_size = 0.5 um
+        mock_lif_class.return_value = MagicMock()
+        mock_metadata.return_value = MagicMock(lasers={}, detectors=[])
 
         runner = CliRunner()
         result = runner.invoke(main, [
@@ -54,10 +58,14 @@ def test_series_filter_with_mock(tmp_path, mock_lif_file, mock_lif_data):
     output_dir = tmp_path / "output"
 
     with patch("lif_figure.cli.list_series") as mock_list, \
-         patch("lif_figure.cli.read_series") as mock_read:
+         patch("lif_figure.cli.read_series") as mock_read, \
+         patch("lif_figure.cli.LifFile") as mock_lif_class, \
+         patch("lif_figure.cli.extract_series_metadata") as mock_metadata:
 
         mock_list.return_value = ["Sample 1", "Sample 2", "Sample 3"]
         mock_read.return_value = (mock_lif_data, 0.5)
+        mock_lif_class.return_value = MagicMock()
+        mock_metadata.return_value = MagicMock(lasers={}, detectors=[])
 
         runner = CliRunner()
         result = runner.invoke(main, [

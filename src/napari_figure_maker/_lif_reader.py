@@ -39,16 +39,35 @@ def read_lif_file(path: str) -> List[Tuple[np.ndarray, dict, str]]:
     lif = LifFile(path)
     layers = []
 
-    for image in lif.image_list:
-        # Get image dimensions
-        n_channels = image.channels
+    # Iterate over images using get_image() which returns LifImage objects
+    for i in range(len(lif.image_list)):
+        image = lif.get_image(i)
+
+        # Get image dimensions from the info dict
+        info = lif.image_list[i]
+        n_channels = info.get('channels', 1)
+        dims = info.get('dims')
+        scale_info = info.get('scale', (None, None, None, None))
+        name = info.get('name', f'Image {i}')
 
         # Read all channels
         channel_data = []
         for c in range(n_channels):
             # Get first frame (z=0, t=0) for each channel
-            frame = image.get_frame(z=0, t=0, c=c)
-            channel_data.append(np.array(frame))
+            try:
+                frame = image.get_frame(z=0, t=0, c=c)
+                channel_data.append(np.array(frame))
+            except Exception:
+                # If get_frame fails, try without parameters
+                try:
+                    frame = image.get_frame()
+                    channel_data.append(np.array(frame))
+                    break  # Only one frame available
+                except Exception:
+                    continue
+
+        if not channel_data:
+            continue
 
         # Stack channels
         if len(channel_data) > 1:
@@ -58,17 +77,18 @@ def read_lif_file(path: str) -> List[Tuple[np.ndarray, dict, str]]:
 
         # Extract scale from metadata
         scale = None
-        if hasattr(image, 'scale') and image.scale:
-            # scale is (x, y, z) in micrometers
-            if len(image.scale) >= 2:
-                scale = (image.scale[1], image.scale[0])  # (y, x) for napari
+        pixel_size_um = None
+        if scale_info and scale_info[0] is not None:
+            pixel_size_um = scale_info[0]  # x scale in um
+            if scale_info[1] is not None:
+                scale = (scale_info[1], scale_info[0])  # (y, x) for napari
 
         # Build layer kwargs
         kwargs = {
-            "name": image.name or "LIF Image",
+            "name": name,
             "metadata": {
                 "source": path,
-                "pixel_size_um": image.scale[0] if image.scale else None,
+                "pixel_size_um": pixel_size_um,
             },
         }
 

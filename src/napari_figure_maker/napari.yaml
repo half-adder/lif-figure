@@ -2,17 +2,17 @@ name: napari-figure-maker
 display_name: Figure Maker
 contributions:
   commands:
-    - id: napari_figure_maker.make_figure_widget
+    - id: napari-figure-maker.make_figure_widget
       python_name: napari_figure_maker._widget:FigureMakerWidget
       title: Open Figure Maker
-    - id: napari_figure_maker.get_lif_reader
+    - id: napari-figure-maker.get_lif_reader
       python_name: napari_figure_maker._lif_reader:napari_get_reader
       title: Read LIF files
   widgets:
-    - command: napari_figure_maker.make_figure_widget
+    - command: napari-figure-maker.make_figure_widget
       display_name: Figure Maker
   readers:
-    - command: napari_figure_maker.get_lif_reader
+    - command: napari-figure-maker.get_lif_reader
       accepts_directories: false
       filename_patterns:
         - "*.lif"

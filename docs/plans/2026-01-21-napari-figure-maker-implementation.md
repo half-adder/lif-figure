@@ -1,16 +1,26 @@
 # napari-figure-maker Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+>
+> **IMPORTANT:** Reference the napari plugin documentation at `/Users/sean/code/napari-docs/docs/plugins` for:
+> - Plugin manifest structure: `building_a_plugin/first_plugin.md`
+> - Best practices (Qt imports, dependencies): `building_a_plugin/best_practices.md`
+> - Testing guidelines: `testing_and_publishing/test.md`
+> - Contribution guides (readers, widgets): `building_a_plugin/guides.md`
 
 **Goal:** Build a napari plugin that creates publication-ready multichannel figure panels from microscopy images.
 
 **Architecture:** Napari serves as the image viewer and source of truth for contrast/colormap settings. The plugin adds a dock widget that captures the current view state, composites channels into a panel grid using numpy/Pillow, and exports at configurable DPI with scale bars and labels.
 
-**Tech Stack:** Python, napari, Pillow, numpy, readlif, PyYAML, pytest
+**Tech Stack:** Python, napari, Pillow, numpy, readlif, PyYAML, pytest, qtpy
 
 ---
 
 ## Task 1: Project Scaffolding
+
+**Reference docs:**
+- `/Users/sean/code/napari-docs/docs/plugins/building_a_plugin/first_plugin.md` - Plugin structure and manifest basics
+- `/Users/sean/code/napari-docs/docs/plugins/building_a_plugin/best_practices.md` - Dependencies and Qt handling
 
 **Files:**
 - Create: `pyproject.toml`
@@ -26,6 +36,11 @@ Expected: Creates basic pyproject.toml and src directory
 
 **Step 2: Create pyproject.toml (overwrite uv default)**
 
+Per napari best practices (`best_practices.md`):
+- Do NOT include `napari[all]`, `PyQt5`, `PyQt6`, or `PySide6` in dependencies
+- Use `qtpy` for Qt imports (not direct Qt backend imports)
+- Include `napari` only if strictly needed (we need it for the widget)
+
 ```toml
 [build-system]
 requires = ["hatchling"]
@@ -38,12 +53,16 @@ description = "Create publication-ready multichannel figure panels from microsco
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
+classifiers = [
+    "Framework :: napari",
+]
 dependencies = [
     "napari>=0.4.18",
     "numpy",
     "pillow",
     "pyyaml",
     "readlif",
+    "qtpy",
 ]
 
 [project.optional-dependencies]
@@ -74,16 +93,24 @@ __version__ = "0.1.0"
 
 **Step 5: Create napari.yaml manifest**
 
+Per `first_plugin.md`, the manifest declares contributions. Initially just register the widget command:
+
 ```yaml
 name: napari-figure-maker
 display_name: Figure Maker
 contributions:
+  commands:
+    - id: napari_figure_maker.make_figure_widget
+      python_name: napari_figure_maker._widget:FigureMakerWidget
+      title: Open Figure Maker
   widgets:
     - command: napari_figure_maker.make_figure_widget
       display_name: Figure Maker
 ```
 
 **Step 6: Create test infrastructure**
+
+Per `testing_and_publishing/test.md`, use `make_napari_viewer_proxy` fixture and prefer unit tests.
 
 `tests/__init__.py`: empty file
 
@@ -176,7 +203,7 @@ Expected: FAIL with "ModuleNotFoundError: No module named 'napari_figure_maker.m
 ```python
 """Configuration data models for napari-figure-maker."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 
@@ -1247,9 +1274,10 @@ Expected: FAIL with "ModuleNotFoundError"
 ```python
 """Preset management for napari-figure-maker."""
 
+import os
 from dataclasses import asdict
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 import yaml
 
@@ -1352,10 +1380,6 @@ Expected: FAIL with "cannot import name 'get_preset_directory'"
 
 Add to `src/napari_figure_maker/presets.py`:
 ```python
-import os
-from typing import Dict, List
-
-
 def get_preset_directory() -> Path:
     """Get the directory where presets are stored.
 
@@ -1504,10 +1528,6 @@ def export_figure(
     if ext in [".tif", ".tiff"]:
         img.save(path, format="TIFF", dpi=(dpi, dpi))
     elif ext == ".png":
-        # PNG uses pixels per meter, convert from DPI
-        ppm = int(dpi / 0.0254)
-        img.save(path, format="PNG", dpi=(dpi, dpi), pnginfo=None)
-        # Re-save with proper metadata using PIL's approach
         img.save(path, format="PNG", dpi=(dpi, dpi))
     else:
         # Default to PNG
@@ -1524,27 +1544,15 @@ def copy_to_clipboard(figure: np.ndarray) -> bool:
         True if successful, False otherwise.
     """
     try:
-        from PIL import Image
         import io
+        import subprocess
+        import sys
+        import tempfile
 
         img = Image.fromarray(figure)
 
         # Platform-specific clipboard handling
-        import sys
         if sys.platform == "darwin":  # macOS
-            import subprocess
-            # Convert to PNG bytes
-            buffer = io.BytesIO()
-            img.save(buffer, format="PNG")
-            buffer.seek(0)
-
-            # Use pbcopy with TIFF (macOS clipboard prefers TIFF)
-            process = subprocess.Popen(
-                ["osascript", "-e", 'set the clipboard to (read (POSIX file "/dev/stdin") as TIFF picture)'],
-                stdin=subprocess.PIPE,
-            )
-            # Actually, simpler approach - save to temp file
-            import tempfile
             with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
                 img.save(f.name, format="PNG")
                 subprocess.run([
@@ -1553,8 +1561,7 @@ def copy_to_clipboard(figure: np.ndarray) -> bool:
                 ])
             return True
         else:
-            # For other platforms, try pyperclip or similar
-            # For now, return False to indicate not implemented
+            # For other platforms, return False to indicate not implemented
             return False
     except Exception:
         return False
@@ -1576,12 +1583,15 @@ git commit -m "feat: add figure export to PNG and TIFF"
 
 ## Task 10: LIF Reader (napari plugin)
 
+**Reference docs:**
+- `/Users/sean/code/napari-docs/docs/plugins/building_a_plugin/guides.md` - Reader contribution guide
+
 **Files:**
 - Create: `src/napari_figure_maker/lif_reader.py`
 - Create: `tests/test_lif_reader.py`
 - Modify: `src/napari_figure_maker/napari.yaml`
 
-**Step 1: Write failing test for LIF series listing**
+**Step 1: Write test structure for LIF reader**
 
 `tests/test_lif_reader.py`:
 ```python
@@ -1593,14 +1603,19 @@ from pathlib import Path
 # Note: These tests require a sample LIF file
 # We'll create a mock for unit testing
 
-from napari_figure_maker.lif_reader import get_lif_series_info
+from napari_figure_maker.lif_reader import get_lif_series_info, napari_get_reader
 
 
-def test_get_lif_series_info_returns_list():
-    """Should return list of series info dicts."""
-    # This test will be skipped if no sample LIF file available
-    # For now, test the function signature with a mock
-    pytest.skip("Requires sample LIF file - integration test")
+def test_napari_get_reader_accepts_lif():
+    """Reader should accept .lif files."""
+    reader = napari_get_reader("sample.lif")
+    assert reader is not None
+
+
+def test_napari_get_reader_rejects_other():
+    """Reader should reject non-LIF files."""
+    reader = napari_get_reader("sample.tiff")
+    assert reader is None
 ```
 
 **Step 2: Implement LIF reader**
@@ -1610,7 +1625,7 @@ def test_get_lif_series_info_returns_list():
 """LIF file reading utilities for napari-figure-maker."""
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -1695,7 +1710,7 @@ def read_lif_series(
         "pixel_size_um": image.scale[0] * 1e6 if image.scale else None,  # Convert m to um
         "z_index": z_index,
         "t_index": t_index,
-        "channel_names": [f"Channel {i}" for i in range(image.channels)],  # LIF doesn't always have names
+        "channel_names": [f"Channel {i}" for i in range(image.channels)],
     }
 
     return channels, metadata
@@ -1703,6 +1718,9 @@ def read_lif_series(
 
 def napari_get_reader(path):
     """napari reader plugin hook.
+
+    Per napari plugin docs, this function is called to determine if this
+    plugin can read the given path.
 
     Args:
         path: Path to file.
@@ -1757,7 +1775,9 @@ def lif_reader_function(path):
 
 **Step 3: Update napari.yaml to register reader**
 
-Update `src/napari_figure_maker/napari.yaml`:
+Per the reader contribution guide in `building_a_plugin/guides.md`:
+
+`src/napari_figure_maker/napari.yaml`:
 ```yaml
 name: napari-figure-maker
 display_name: Figure Maker
@@ -1779,7 +1799,12 @@ contributions:
         - "*.lif"
 ```
 
-**Step 4: Commit**
+**Step 4: Run tests to verify they pass**
+
+Run: `cd /Users/sean/code/napari-figure-maker && uv run pytest tests/test_lif_reader.py -v`
+Expected: All PASS
+
+**Step 5: Commit**
 
 ```bash
 git add -A
@@ -1790,11 +1815,17 @@ git commit -m "feat: add LIF file reader with napari plugin integration"
 
 ## Task 11: Main Widget UI
 
+**Reference docs:**
+- `/Users/sean/code/napari-docs/docs/plugins/building_a_plugin/best_practices.md` - Use `qtpy` for Qt imports
+- `/Users/sean/code/napari-docs/docs/plugins/testing_and_publishing/test.md` - Widget testing with `make_napari_viewer_proxy`
+
 **Files:**
 - Create: `src/napari_figure_maker/_widget.py`
 - Create: `tests/test_widget.py`
 
 **Step 1: Write basic widget test**
+
+Per `test.md`, use `make_napari_viewer_proxy` fixture and prefer unit tests over full integration tests.
 
 `tests/test_widget.py`:
 ```python
@@ -1806,11 +1837,11 @@ import pytest
 pytest.importorskip("napari")
 
 
-def test_widget_creates(make_napari_viewer):
+def test_widget_creates(make_napari_viewer_proxy):
     """Widget should instantiate without error."""
     from napari_figure_maker._widget import FigureMakerWidget
 
-    viewer = make_napari_viewer()
+    viewer = make_napari_viewer_proxy()
     widget = FigureMakerWidget(viewer)
 
     assert widget is not None
@@ -1818,14 +1849,18 @@ def test_widget_creates(make_napari_viewer):
 
 **Step 2: Implement the widget**
 
+Per `best_practices.md`: Use `qtpy` for Qt imports, NOT direct PyQt5/PyQt6/PySide6 imports.
+
 `src/napari_figure_maker/_widget.py`:
 ```python
 """Main napari widget for figure generation."""
 
 from pathlib import Path
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import numpy as np
+
+# Per napari best practices: use qtpy, not direct Qt backend imports
 from qtpy.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -1846,6 +1881,9 @@ from napari_figure_maker.models import ChannelConfig, FigureConfig
 from napari_figure_maker.figure_builder import build_figure
 from napari_figure_maker.exporter import export_figure, copy_to_clipboard
 from napari_figure_maker.presets import list_presets, load_preset, save_preset, get_preset_directory
+
+if TYPE_CHECKING:
+    import napari
 
 
 class ChannelConfigWidget(QWidget):
@@ -1907,7 +1945,7 @@ class ChannelConfigWidget(QWidget):
 class FigureMakerWidget(QWidget):
     """Main widget for generating figures from napari layers."""
 
-    def __init__(self, napari_viewer):
+    def __init__(self, napari_viewer: "napari.Viewer"):
         super().__init__()
         self.viewer = napari_viewer
         self.channel_widgets: List[ChannelConfigWidget] = []
@@ -2165,11 +2203,16 @@ class FigureMakerWidget(QWidget):
 
 **Step 3: Update conftest.py for widget testing**
 
+Per `test.md`, napari provides `make_napari_viewer_proxy` but we may need our own fixture for cleaner testing:
+
 Add to `tests/conftest.py`:
 ```python
 @pytest.fixture
-def make_napari_viewer():
-    """Fixture to create napari viewers for testing."""
+def make_napari_viewer_proxy():
+    """Fixture to create napari viewer proxy for testing.
+
+    Per napari testing docs, this returns a proxy that can be used safely.
+    """
     pytest.importorskip("napari")
     from napari import Viewer
 
@@ -2186,7 +2229,12 @@ def make_napari_viewer():
         v.close()
 ```
 
-**Step 4: Commit**
+**Step 4: Run tests**
+
+Run: `cd /Users/sean/code/napari-figure-maker && uv run pytest tests/test_widget.py -v`
+Expected: PASS (may skip if Qt not available in test environment)
+
+**Step 5: Commit**
 
 ```bash
 git add -A
@@ -2196,6 +2244,9 @@ git commit -m "feat: add FigureMakerWidget with full UI"
 ---
 
 ## Task 12: Integration Testing & Polish
+
+**Reference docs:**
+- `/Users/sean/code/napari-docs/docs/plugins/testing_and_publishing/test.md` - Testing guidelines
 
 **Files:**
 - Create: `tests/test_integration.py`
@@ -2314,7 +2365,7 @@ Or for development:
 ```bash
 git clone https://github.com/yourusername/napari-figure-maker
 cd napari-figure-maker
-pip install -e ".[dev]"
+uv sync --all-extras
 ```
 
 ## Usage
@@ -2339,6 +2390,13 @@ Presets are saved as YAML files in:
 - Linux: `~/.config/napari-figure-maker/presets/`
 - Windows: `%APPDATA%/napari-figure-maker/presets/`
 
+## Development
+
+For development, refer to the napari plugin documentation:
+- Plugin structure: `/Users/sean/code/napari-docs/docs/plugins/building_a_plugin/first_plugin.md`
+- Best practices: `/Users/sean/code/napari-docs/docs/plugins/building_a_plugin/best_practices.md`
+- Testing: `/Users/sean/code/napari-docs/docs/plugins/testing_and_publishing/test.md`
+
 ## License
 
 MIT
@@ -2362,13 +2420,20 @@ git commit -m "feat: add integration tests and README"
 
 This plan creates a fully functional napari plugin with:
 
-1. **Data models** (Task 2) - `ChannelConfig` and `FigureConfig` dataclasses
-2. **Scale bar rendering** (Task 3) - Calculate nice lengths, render with Pillow
-3. **Figure building** (Tasks 4-7) - Channel rendering, merge composite, grid layout, labels
-4. **Presets** (Task 8) - YAML save/load with directory management
-5. **Export** (Task 9) - PNG/TIFF export with DPI settings
-6. **LIF reader** (Task 10) - napari reader plugin for Leica files
-7. **Widget UI** (Task 11) - Full Qt widget with all controls
-8. **Integration tests** (Task 12) - End-to-end testing and documentation
+1. **Project scaffolding** (Task 1) - pyproject.toml, napari.yaml manifest, test infrastructure
+2. **Data models** (Task 2) - `ChannelConfig` and `FigureConfig` dataclasses
+3. **Scale bar rendering** (Task 3) - Calculate nice lengths, render with Pillow
+4. **Figure building** (Tasks 4-7) - Channel rendering, merge composite, grid layout, labels
+5. **Presets** (Task 8) - YAML save/load with directory management
+6. **Export** (Task 9) - PNG/TIFF export with DPI settings
+7. **LIF reader** (Task 10) - napari reader plugin for Leica files
+8. **Widget UI** (Task 11) - Full Qt widget with all controls
+9. **Integration tests** (Task 12) - End-to-end testing and documentation
 
 Each task follows TDD: write failing test → implement → verify passing → commit.
+
+**Key napari plugin documentation references:**
+- `/Users/sean/code/napari-docs/docs/plugins/building_a_plugin/first_plugin.md` - Plugin basics
+- `/Users/sean/code/napari-docs/docs/plugins/building_a_plugin/best_practices.md` - Qt handling, dependencies
+- `/Users/sean/code/napari-docs/docs/plugins/building_a_plugin/guides.md` - Reader/widget contributions
+- `/Users/sean/code/napari-docs/docs/plugins/testing_and_publishing/test.md` - Testing guidelines

@@ -1,0 +1,10 @@
+name: napari-figure-maker
+display_name: Figure Maker
+contributions:
+  commands:
+    - id: napari_figure_maker.make_figure_widget
+      python_name: napari_figure_maker._widget:FigureMakerWidget
+      title: Open Figure Maker
+  widgets:
+    - command: napari_figure_maker.make_figure_widget
+      display_name: Figure Maker

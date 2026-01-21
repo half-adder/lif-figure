@@ -184,3 +184,121 @@ def add_label_to_panel(
     draw.text((x, y), label, fill=color, font=font)
 
     return np.array(img)
+
+
+def build_figure(
+    channels_data: List[np.ndarray],
+    channel_configs: "List[ChannelConfig]",
+    figure_config: "FigureConfig",
+    pixel_size_um: Optional[float] = None,
+    contrast_limits: Optional[List[Tuple[float, float]]] = None,
+) -> np.ndarray:
+    """Build a complete figure from channel data.
+
+    Args:
+        channels_data: List of 2D numpy arrays, one per channel.
+        channel_configs: Configuration for each channel.
+        figure_config: Overall figure configuration.
+        pixel_size_um: Pixel size in micrometers (for scale bar).
+        contrast_limits: Contrast limits per channel. If None, uses data min/max.
+
+    Returns:
+        RGB numpy array of the complete figure.
+    """
+    from napari_figure_maker.models import ChannelConfig, FigureConfig
+    from napari_figure_maker.scale_bar import calculate_nice_scale_bar_length, render_scale_bar
+
+    if len(channels_data) != len(channel_configs):
+        raise ValueError("channels_data and channel_configs must have same length")
+
+    # Default contrast limits
+    if contrast_limits is None:
+        contrast_limits = [(d.min(), d.max()) for d in channels_data]
+
+    # Render each channel to RGB
+    rgb_channels = []
+    for data, config, clim in zip(channels_data, channel_configs, contrast_limits):
+        if config.visible:
+            rgb = render_channel_to_rgb(data, config.colormap, clim)
+            rgb_channels.append(rgb)
+
+    # Build panels list
+    panels = []
+    visible_configs = [c for c in channel_configs if c.visible]
+
+    for rgb, config in zip(rgb_channels, visible_configs):
+        # Add label if configured
+        label = config.label or config.name
+        panel = add_label_to_panel(
+            rgb,
+            label=label,
+            position=figure_config.label_position,
+            font_size=figure_config.label_font_size,
+            color=figure_config.label_color or "white",
+        )
+        panels.append(panel)
+
+    # Create merge if requested
+    if figure_config.show_merge and len(rgb_channels) > 1:
+        merge = create_merge_composite(rgb_channels)
+        merge = add_label_to_panel(
+            merge,
+            label="Merge",
+            position=figure_config.label_position,
+            font_size=figure_config.label_font_size,
+            color=figure_config.label_color or "white",
+        )
+        panels.append(merge)
+
+    # Arrange in grid
+    grid = arrange_panels_in_grid(
+        panels,
+        gap_fraction=figure_config.panel_gap_fraction,
+        background_color=figure_config.background_color,
+        columns=figure_config.grid_columns,
+    )
+
+    # Add scale bar if pixel size is known
+    if pixel_size_um is not None:
+        grid = _add_scale_bar_to_figure(grid, pixel_size_um, figure_config)
+
+    return grid
+
+
+def _add_scale_bar_to_figure(
+    figure: np.ndarray,
+    pixel_size_um: float,
+    config: "FigureConfig",
+) -> np.ndarray:
+    """Add scale bar to bottom-right of figure."""
+    from napari_figure_maker.models import FigureConfig
+    from napari_figure_maker.scale_bar import calculate_nice_scale_bar_length, render_scale_bar
+
+    image_width_um = figure.shape[1] * pixel_size_um
+
+    # Calculate nice scale bar length
+    if config.scale_bar_length_um is not None:
+        bar_length = config.scale_bar_length_um
+    else:
+        bar_length = calculate_nice_scale_bar_length(image_width_um)
+
+    # Render scale bar
+    bar_img = render_scale_bar(
+        length_um=bar_length,
+        pixel_size_um=pixel_size_um,
+        color=config.scale_bar_color,
+        font_size=config.scale_bar_font_size,
+    )
+
+    # Convert figure to PIL
+    fig_pil = Image.fromarray(figure)
+
+    # Calculate position (bottom-right with padding)
+    padding = 10
+    x = figure.shape[1] - bar_img.width - padding
+    y = figure.shape[0] - bar_img.height - padding
+
+    # Paste scale bar (with alpha)
+    fig_pil.paste(bar_img, (x, y), bar_img)
+
+    return np.array(fig_pil)

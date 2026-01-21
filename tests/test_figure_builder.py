@@ -7,7 +7,9 @@ from napari_figure_maker.figure_builder import (
     create_merge_composite,
     arrange_panels_in_grid,
     add_label_to_panel,
+    build_figure,
 )
+from napari_figure_maker.models import ChannelConfig, FigureConfig
 
 
 def test_render_channel_to_rgb_gray():
@@ -153,3 +155,62 @@ def test_add_label_to_panel():
     # Check a small region where text should be
     top_left_region = labeled[5:20, 5:50]
     assert top_left_region.max() > 0  # Some white pixels from text
+
+
+def test_build_figure_basic():
+    """Should build a complete figure with channels and merge."""
+    # Two simple channels
+    channels_data = [
+        np.full((50, 50), 100, dtype=np.uint8),  # Channel 1
+        np.full((50, 50), 200, dtype=np.uint8),  # Channel 2
+    ]
+
+    channel_configs = [
+        ChannelConfig(name="Ch1", colormap="green"),
+        ChannelConfig(name="Ch2", colormap="magenta"),
+    ]
+
+    figure_config = FigureConfig(
+        show_merge=True,
+        panel_gap_fraction=0.0,
+    )
+
+    result = build_figure(
+        channels_data=channels_data,
+        channel_configs=channel_configs,
+        figure_config=figure_config,
+        pixel_size_um=None,  # No scale bar
+    )
+
+    assert isinstance(result, np.ndarray)
+    # 3 panels: Ch1, Ch2, Merge
+    assert result.shape[1] == 50 * 3  # Width = 3 panels
+    assert result.shape[0] == 50  # Height = 1 panel
+
+
+def test_build_figure_no_merge():
+    """Should build figure without merge panel."""
+    channels_data = [
+        np.full((50, 50), 100, dtype=np.uint8),
+        np.full((50, 50), 200, dtype=np.uint8),
+    ]
+
+    channel_configs = [
+        ChannelConfig(name="Ch1", colormap="green"),
+        ChannelConfig(name="Ch2", colormap="magenta"),
+    ]
+
+    figure_config = FigureConfig(
+        show_merge=False,
+        panel_gap_fraction=0.0,
+    )
+
+    result = build_figure(
+        channels_data=channels_data,
+        channel_configs=channel_configs,
+        figure_config=figure_config,
+        pixel_size_um=None,
+    )
+
+    # 2 panels only (no merge)
+    assert result.shape[1] == 50 * 2

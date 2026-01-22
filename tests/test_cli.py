@@ -110,3 +110,19 @@ class TestParseSeriesIndices:
     def test_leading_trailing_whitespace(self):
         """Leading/trailing whitespace stripped."""
         assert parse_series_indices("  2..4  ", 10) == [2, 3, 4]
+
+    def test_open_start(self):
+        """..N means 0 through N."""
+        assert parse_series_indices("..2", 10) == [0, 1, 2]
+
+    def test_open_end(self):
+        """N.. means N through last."""
+        assert parse_series_indices("7..", 10) == [7, 8, 9]
+
+    def test_open_start_negative_end(self):
+        """..-2 means 0 through second-to-last."""
+        assert parse_series_indices("..-2", 10) == [0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+    def test_open_negative_start(self):
+        """-3.. means third-from-end through last."""
+        assert parse_series_indices("-3..", 10) == [7, 8, 9]

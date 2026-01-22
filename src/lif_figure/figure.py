@@ -334,7 +334,10 @@ def _add_scale_bar(ax, scale_bar_info: tuple[int, str], config: Config) -> None:
     ylim = ax.get_ylim()
 
     # For imshow, y-axis is inverted: ylim[0] is bottom (large), ylim[1] is top (small)
-    margin = 20  # pixels from edge
+    # Use margin proportional to image size (3% of smaller dimension)
+    img_width = xlim[1] - xlim[0]
+    img_height = ylim[0] - ylim[1]  # ylim inverted for images
+    margin = max(10, int(min(img_width, img_height) * 0.03))
     x_end = xlim[1] - margin
     x_start = x_end - bar_pixels
     y_bar = ylim[0] - margin  # Position bar inside from bottom

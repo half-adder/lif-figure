@@ -72,26 +72,47 @@ def _extract_lasers(attachment, metadata: SeriesMetadata) -> None:
 
 
 def _extract_detectors(attachment, metadata: SeriesMetadata) -> None:
-    """Extract active detector settings from HardwareSetting."""
+    """Extract active detector settings from HardwareSetting.
+
+    Finds HyD detectors with complete acquisition info (Gain attribute),
+    deduplicates by channel, and sorts by channel number to match image order.
+    """
+    # Collect detectors with complete info, keyed by channel
+    detectors_by_channel: dict[int, DetectorInfo] = {}
+
     for detector in attachment.iter('Detector'):
-        if detector.get('IsActive') == '1':
-            # Get detector name (fall back to index-based name)
-            name = detector.get('DetectorName', '').strip()
-            if not name:
-                name = f"HyD{len(metadata.detectors) + 1}"
+        # Only consider HyD detectors with Gain info (complete acquisition settings)
+        name = detector.get('Name', '')
+        if not name.startswith('HyD') or not detector.get('Gain'):
+            continue
 
-            # Get acquisition mode
-            mode_name = detector.get('AcquisitionModeName', '')
-            mode = "PC" if mode_name == "PhotonCounting" else "Std"
+        try:
+            channel = int(detector.get('Channel', '0'))
+        except ValueError:
+            continue
 
-            # Get gain
-            gain_str = detector.get('Gain', '0')
-            try:
-                gain = float(gain_str)
-            except ValueError:
-                gain = 0.0
+        # Get acquisition mode
+        mode_name = detector.get('AcquisitionModeName', '')
+        if mode_name == "PhotonCounting":
+            mode = "PC"
+        elif mode_name == "PhotonIntegration":
+            mode = "Std"
+        else:
+            mode = "Std"
 
-            metadata.detectors.append(DetectorInfo(name=name, mode=mode, gain=gain))
+        # Get gain
+        gain_str = detector.get('Gain', '0')
+        try:
+            gain = float(gain_str)
+        except ValueError:
+            gain = 0.0
+
+        # Store by channel (later entries overwrite, but they should be the same)
+        detectors_by_channel[channel] = DetectorInfo(name=name, mode=mode, gain=gain)
+
+    # Sort by channel number and add to metadata
+    for channel in sorted(detectors_by_channel.keys()):
+        metadata.detectors.append(detectors_by_channel[channel])
 
 
 def parse_zstack_mode(mode_str: str) -> tuple[str, Optional[tuple[int, int]]]:

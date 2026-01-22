@@ -18,6 +18,19 @@ def sanitize_filename(name: str) -> str:
     return re.sub(r'[/\\:*?"<>|]', "_", name)
 
 
+def save_figure(fig, output_file: Path, background: str) -> None:
+    """Save figure with proper background handling."""
+    is_transparent = background.lower() == "transparent"
+    facecolor = "none" if is_transparent else background
+    fig.savefig(
+        output_file,
+        format="pdf",
+        bbox_inches="tight",
+        facecolor=facecolor,
+        transparent=is_transparent,
+    )
+
+
 @click.command()
 @click.argument("input_file", type=click.Path(exists=False))
 @click.option(
@@ -67,6 +80,11 @@ def sanitize_filename(name: str) -> str:
     default=False,
     help="Normalize each Z-slice independently (default: normalize across stack)",
 )
+@click.option(
+    "--background", "-bg",
+    default=None,
+    help="Background color: black, white, transparent, or any color name/hex (default: black)",
+)
 def main(
     input_file: str,
     channels: str,
@@ -77,6 +95,7 @@ def main(
     auto_contrast: Optional[str],
     no_metadata: bool,
     per_slice_norm: bool,
+    background: Optional[str],
 ) -> None:
     """Generate publication-ready figure panels from LIF files.
 
@@ -124,6 +143,10 @@ def main(
                 click.echo(f"Error: Invalid auto-contrast format: '{auto_contrast}'", err=True)
                 click.echo("Expected format: LOW,HIGH (e.g., '0.5,99.5')", err=True)
                 sys.exit(1)
+
+    # Handle background color override
+    if background is not None:
+        cfg.background = background
 
     # Get series to process
     all_series = list_series(input_path)
@@ -180,7 +203,7 @@ def main(
 
                 safe_name = sanitize_filename(series_name)
                 output_file = output_path / f"{safe_name}.pdf"
-                fig.savefig(output_file, format="pdf", bbox_inches="tight", facecolor=cfg.background)
+                save_figure(fig, output_file, cfg.background)
                 plt.close(fig)
 
                 click.echo(f" → {output_file}")
@@ -204,7 +227,7 @@ def main(
                         normalization_ranges=norm_ranges,
                     )
                     output_file = subdir / f"z{z:02d}.pdf"
-                    fig.savefig(output_file, format="pdf", bbox_inches="tight", facecolor=cfg.background)
+                    save_figure(fig, output_file, cfg.background)
                     plt.close(fig)
 
                 click.echo(f" → {subdir}/ ({data.shape[0]} frames)")
@@ -226,7 +249,7 @@ def main(
 
                 safe_name = sanitize_filename(series_name)
                 output_file = output_path / f"{safe_name}.pdf"
-                fig.savefig(output_file, format="pdf", bbox_inches="tight", facecolor=cfg.background)
+                save_figure(fig, output_file, cfg.background)
                 plt.close(fig)
 
                 click.echo(f" → {output_file} ({data.shape[0]} rows)")

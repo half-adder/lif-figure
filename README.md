@@ -70,6 +70,7 @@ lif-figure input.lif \
 | `--auto-contrast` | `-a` | Enable auto-contrast (optional: `LOW,HIGH` percentiles) |
 | `--no-metadata` | | Hide acquisition metadata table |
 | `--per-slice-norm` | | Normalize each Z-slice independently (default: across stack) |
+| `--background` | `-bg` | Background color: black, white, transparent, or any color (default: black) |
 
 ### Z-Stack Modes
 

@@ -26,6 +26,11 @@ COLOR_MAP = {
 }
 
 
+def _get_facecolor(background: str) -> str:
+    """Convert background color to matplotlib facecolor."""
+    return "none" if background.lower() == "transparent" else background
+
+
 def normalize_channel(
     data: np.ndarray,
     percentiles: Optional[tuple[float, float]] = None,
@@ -212,7 +217,7 @@ def build_figure(
         table_ax = None
 
     # Set background
-    fig.patch.set_facecolor(config.background)
+    fig.patch.set_facecolor(_get_facecolor(config.background))
 
     # Calculate scale bar if pixel size available
     scale_bar_info = None
@@ -224,7 +229,7 @@ def build_figure(
         ax.imshow(norm_ch, cmap="gray", vmin=0, vmax=1)
         ax.set_title(name, fontsize=config.font_size, color="white" if config.background == "black" else "black")
         ax.axis("off")
-        ax.set_facecolor(config.background)
+        ax.set_facecolor(_get_facecolor(config.background))
 
         # Add scale bar
         if scale_bar_info:
@@ -235,7 +240,7 @@ def build_figure(
     ax_merge.imshow(merge)
     ax_merge.set_title("Merge", fontsize=config.font_size, color="white" if config.background == "black" else "black")
     ax_merge.axis("off")
-    ax_merge.set_facecolor(config.background)
+    ax_merge.set_facecolor(_get_facecolor(config.background))
 
     if scale_bar_info:
         _add_scale_bar(ax_merge, scale_bar_info, config)
@@ -257,7 +262,7 @@ def _add_metadata_table(
 ) -> None:
     """Add metadata table below the figure panels."""
     ax.axis("off")
-    ax.set_facecolor(config.background)
+    ax.set_facecolor(_get_facecolor(config.background))
 
     # Build table data
     headers = ["Channel", "Laser", "Power", "Detector", "Mode", "Gain", "Contrast"]
@@ -313,7 +318,7 @@ def _add_metadata_table(
     # Style cells
     for key, cell in table.get_celld().items():
         cell.set_edgecolor(text_color)
-        cell.set_facecolor(config.background)
+        cell.set_facecolor(_get_facecolor(config.background))
         cell.set_text_props(color=text_color)
         # Bold header row
         if key[0] == 0:
@@ -324,23 +329,29 @@ def _add_scale_bar(ax, scale_bar_info: tuple[int, str], config: Config) -> None:
     """Add scale bar to an axis."""
     bar_pixels, label = scale_bar_info
 
-    # Position in bottom-right
+    # Position in bottom-right, inside the image
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
 
-    x_start = xlim[1] - bar_pixels - 10
-    x_end = xlim[1] - 10
-    y_pos = ylim[0] - 10  # Note: y-axis is inverted for images
+    # For imshow, y-axis is inverted: ylim[0] is bottom (large), ylim[1] is top (small)
+    margin = 20  # pixels from edge
+    x_end = xlim[1] - margin
+    x_start = x_end - bar_pixels
+    y_bar = ylim[0] - margin  # Position bar inside from bottom
 
-    bar_color = "white" if config.background == "black" else "black"
+    bar_color = "white"  # Always white for visibility on microscopy images
 
-    ax.plot([x_start, x_end], [y_pos, y_pos], color=bar_color, linewidth=config.scale_bar_height)
-    ax.text(
-        (x_start + x_end) / 2, y_pos + 15,
+    ax.plot([x_start, x_end], [y_bar, y_bar], color=bar_color, linewidth=config.scale_bar_height)
+    # TODO: Consider a more robust alignment strategy (e.g., compute text bbox and adjust)
+    ax.annotate(
         label,
-        ha="center", va="top",
+        xy=(x_end, y_bar),  # Anchor at bar's right edge
+        xytext=(0, 6),  # Offset upward in points
+        textcoords="offset points",
+        ha="right", va="bottom",
         fontsize=config.font_size - 2,
         color=bar_color,
+        annotation_clip=False,
     )
 
 
@@ -416,7 +427,7 @@ def build_rows_figure(
     for c, name in enumerate(names):
         header_ax = fig.add_subplot(gs[0, c + 1])
         header_ax.axis("off")
-        header_ax.set_facecolor(config.background)
+        header_ax.set_facecolor(_get_facecolor(config.background))
         header_ax.text(
             0.5, 0.5, name,
             ha="center", va="center",
@@ -427,7 +438,7 @@ def build_rows_figure(
     # Merge header
     merge_header_ax = fig.add_subplot(gs[0, n_cols])
     merge_header_ax.axis("off")
-    merge_header_ax.set_facecolor(config.background)
+    merge_header_ax.set_facecolor(_get_facecolor(config.background))
     merge_header_ax.text(
         0.5, 0.5, "Merge",
         ha="center", va="center",
@@ -436,7 +447,7 @@ def build_rows_figure(
         transform=merge_header_ax.transAxes,
     )
 
-    fig.patch.set_facecolor(config.background)
+    fig.patch.set_facecolor(_get_facecolor(config.background))
 
     # Calculate scale bar
     scale_bar_info = None
@@ -465,7 +476,7 @@ def build_rows_figure(
         # Z-position label (leftmost column)
         z_label_ax = fig.add_subplot(gs[row_idx, 0])
         z_label_ax.axis("off")
-        z_label_ax.set_facecolor(config.background)
+        z_label_ax.set_facecolor(_get_facecolor(config.background))
 
         # Calculate Z position in microns if available
         if z_pixel_size_um is not None:
@@ -487,13 +498,13 @@ def build_rows_figure(
             ax = fig.add_subplot(gs[row_idx, c + 1])
             ax.imshow(normalized[c], cmap="gray", vmin=0, vmax=1)
             ax.axis("off")
-            ax.set_facecolor(config.background)
+            ax.set_facecolor(_get_facecolor(config.background))
 
         # Plot merge
         ax_merge = fig.add_subplot(gs[row_idx, n_cols])
         ax_merge.imshow(merge)
         ax_merge.axis("off")
-        ax_merge.set_facecolor(config.background)
+        ax_merge.set_facecolor(_get_facecolor(config.background))
 
         # Scale bar on bottom-right merge panel only
         if z == n_z - 1 and scale_bar_info:

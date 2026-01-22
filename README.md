@@ -29,13 +29,13 @@ Or see the [uv installation guide](https://docs.astral.sh/uv/getting-started/ins
 ### Run without installing
 
 ```bash
-uvx lif-figure input.lif --channels "DAPI,GFP,mCherry"
+uvx --from git+https://github.com/half-adder/lif-figure lif-figure input.lif --channels "DAPI,GFP,mCherry"
 ```
 
 ### Install as a tool
 
 ```bash
-uv tool install lif-figure
+uv tool install git+https://github.com/half-adder/lif-figure
 lif-figure input.lif --channels "DAPI,GFP,mCherry"
 ```
 

@@ -12,7 +12,7 @@ from readlif.reader import LifFile
 class DetectorInfo:
     """Information about a detector channel."""
     name: str
-    mode: str  # "Std" or "PC" (PhotonCounting)
+    mode: str  # "Std", "PC" (PhotonCounting), or "-" (PMT has no mode)
     gain: float
 
 
@@ -43,15 +43,50 @@ def extract_series_metadata(lif: LifFile, series_name: str) -> SeriesMetadata:
     # Find the series Element
     for elem in root.iter('Element'):
         if elem.get('Name') == xml_series_name:
+            # Get active channels from MultiBand elements
+            active_channels = _get_active_channels(elem)
+
             # Find HardwareSetting attachment
             for attachment in elem.iter('Attachment'):
                 if attachment.get('Name') == 'HardwareSetting':
                     _extract_lasers(attachment, metadata)
-                    _extract_detectors(attachment, metadata)
+                    _extract_detectors(attachment, metadata, active_channels)
                     break
             break
 
     return metadata
+
+
+def _get_active_channels(series_element) -> list[int]:
+    """Identify active detector channels from MultiBand detection ranges.
+
+    MultiBand elements define spectral detection windows. Inactive channels
+    have narrow placeholder ranges (~5nm), while active channels have
+    meaningful detection ranges (>10nm).
+
+    Args:
+        series_element: XML Element for the series
+
+    Returns:
+        Sorted list of active channel numbers
+    """
+    active = []
+    seen: set[str] = set()
+
+    for mb in series_element.iter('MultiBand'):
+        ch = mb.get('Channel')
+        if ch and ch not in seen:
+            seen.add(ch)
+            try:
+                left = float(mb.get('LeftWorld', 0))
+                right = float(mb.get('RightWorld', 0))
+                width = right - left
+                if width > 10:  # Active detection window threshold
+                    active.append(int(ch))
+            except (ValueError, TypeError):
+                pass
+
+    return sorted(active)
 
 
 def _extract_lasers(attachment, metadata: SeriesMetadata) -> None:
@@ -71,34 +106,51 @@ def _extract_lasers(attachment, metadata: SeriesMetadata) -> None:
                     pass
 
 
-def _extract_detectors(attachment, metadata: SeriesMetadata) -> None:
-    """Extract active detector settings from HardwareSetting.
+def _extract_detectors(
+    attachment,
+    metadata: SeriesMetadata,
+    active_channels: Optional[list[int]] = None,
+) -> None:
+    """Extract detector settings from HardwareSetting.
 
-    Finds HyD detectors with complete acquisition info (Gain attribute),
-    deduplicates by channel, and sorts by channel number to match image order.
+    Uses active_channels (from MultiBand) to identify which detectors were
+    actually used for imaging. Supports both HyD and PMT detectors.
+
+    Args:
+        attachment: HardwareSetting XML element
+        metadata: SeriesMetadata to populate
+        active_channels: List of active channel numbers from MultiBand.
+                        If None, falls back to Gain > 0 heuristic.
     """
     # Collect detectors with complete info, keyed by channel
     detectors_by_channel: dict[int, DetectorInfo] = {}
 
     for detector in attachment.iter('Detector'):
-        # Only consider HyD detectors with Gain info (complete acquisition settings)
-        name = detector.get('Name', '')
-        if not name.startswith('HyD') or not detector.get('Gain'):
+        # Only consider detectors with Gain info (complete acquisition settings)
+        if not detector.get('Gain'):
             continue
 
+        name = detector.get('Name', '')
         try:
             channel = int(detector.get('Channel', '0'))
         except ValueError:
             continue
 
-        # Get acquisition mode
-        mode_name = detector.get('AcquisitionModeName', '')
-        if mode_name == "PhotonCounting":
-            mode = "PC"
-        elif mode_name == "PhotonIntegration":
-            mode = "Std"
+        # Skip channel 100 (PMT Trans - transmitted light)
+        if channel == 100:
+            continue
+
+        # Get acquisition mode based on detector type
+        if name.startswith('PMT'):
+            mode = "-"  # PMT has no acquisition mode concept
         else:
-            mode = "Std"
+            mode_name = detector.get('AcquisitionModeName', '')
+            if mode_name == "PhotonCounting":
+                mode = "PC"
+            elif mode_name == "PhotonIntegration":
+                mode = "Std"
+            else:
+                mode = "Std"
 
         # Get gain
         gain_str = detector.get('Gain', '0')
@@ -110,9 +162,20 @@ def _extract_detectors(attachment, metadata: SeriesMetadata) -> None:
         # Store by channel (later entries overwrite, but they should be the same)
         detectors_by_channel[channel] = DetectorInfo(name=name, mode=mode, gain=gain)
 
-    # Sort by channel number and add to metadata
-    for channel in sorted(detectors_by_channel.keys()):
-        metadata.detectors.append(detectors_by_channel[channel])
+    # Determine which channels to include
+    if active_channels:
+        # Use MultiBand-derived active channels
+        channels_to_use = [ch for ch in active_channels if ch in detectors_by_channel]
+    else:
+        # Fallback: use all channels with Gain > 0, sorted by channel number
+        channels_to_use = sorted(
+            ch for ch, det in detectors_by_channel.items() if det.gain > 0
+        )
+
+    # Add detectors in channel order
+    for channel in channels_to_use:
+        if channel in detectors_by_channel:
+            metadata.detectors.append(detectors_by_channel[channel])
 
 
 def parse_zstack_mode(mode_str: str) -> tuple[str, Optional[tuple[int, int]]]:

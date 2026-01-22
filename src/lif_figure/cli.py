@@ -31,6 +31,25 @@ def save_figure(fig, output_file: Path, background: str) -> None:
     )
 
 
+def parse_series_indices(spec: str, max_index: int) -> list[int]:
+    """Parse index specification like '0-2,5,8-10' into [0,1,2,5,8,9,10]."""
+    indices = []
+    for part in spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            start, end = part.split("-")
+            indices.extend(range(int(start), int(end) + 1))
+        else:
+            indices.append(int(part))
+
+    # Validate all in range
+    for i in indices:
+        if i < 0 or i >= max_index:
+            raise ValueError(f"Index {i} out of range (0-{max_index - 1})")
+
+    return sorted(set(indices))  # Dedupe and sort
+
+
 @click.command()
 @click.argument("input_file", type=click.Path(exists=False))
 @click.option(
@@ -42,6 +61,11 @@ def save_figure(fig, output_file: Path, background: str) -> None:
     "--series", "-s",
     default=None,
     help="Series to process, comma-separated (default: all)",
+)
+@click.option(
+    "--series-index", "-si",
+    default=None,
+    help="Series indices to process (0-indexed), comma-separated with ranges (e.g., '0-2,5,8-10')",
 )
 @click.option(
     "--output", "-o",
@@ -89,6 +113,7 @@ def main(
     input_file: str,
     channels: str,
     series: Optional[str],
+    series_index: Optional[str],
     output: str,
     zstack: str,
     config: Optional[str],
@@ -162,7 +187,20 @@ def main(
     # Get series to process
     all_series = list_series(input_path)
 
-    if series:
+    # Check mutual exclusivity
+    if series and series_index:
+        click.echo("Error: Cannot use both --series and --series-index. Use one or the other.", err=True)
+        sys.exit(1)
+
+    if series_index:
+        try:
+            indices = parse_series_indices(series_index, len(all_series))
+            series_names = [all_series[i] for i in indices]
+        except ValueError as e:
+            click.echo(f"Error: {e}", err=True)
+            click.echo(f"File contains {len(all_series)} series (indices 0-{len(all_series) - 1}).", err=True)
+            sys.exit(1)
+    elif series:
         series_names = [s.strip() for s in series.split(",")]
         # Validate series names
         for name in series_names:

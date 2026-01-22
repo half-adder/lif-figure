@@ -73,7 +73,7 @@ lif-figure input.lif \
 |--------|-------|-------------|
 | `--channels` | `-c` | Channel names, comma-separated (required) |
 | `--series` | `-s` | Series to process, comma-separated (default: all) |
-| `--series-index` | `-si` | Series indices to process (0-indexed), e.g., `0-2,5,8-10` |
+| `--series-index` | `-si` | Series indices: `5`, `2..5`, `-1`, `3..`, `..3` (0-indexed) |
 | `--output` | `-o` | Output directory (default: `./figures`) |
 | `--zstack` | `-z` | Z-stack mode: `max`, `max:START-END`, `frames` (default: `max`) |
 | `--config` | | YAML config file path |

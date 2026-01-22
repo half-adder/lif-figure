@@ -32,22 +32,89 @@ def save_figure(fig, output_file: Path, background: str) -> None:
 
 
 def parse_series_indices(spec: str, max_index: int) -> list[int]:
-    """Parse index specification like '0-2,5,8-10' into [0,1,2,5,8,9,10]."""
+    """Parse index specification like '0..2,5,8..' into [0,1,2,5,8,9].
+
+    Supports:
+    - Single indices: 5
+    - Ranges: 2..5 (inclusive)
+    - Negative indices: -1 (last), -3 (third from end)
+    - Open ranges: ..3 (start to 3), 5.. (5 to end)
+    - Mixed: 0..2,5,-1
+
+    Raises ValueError for invalid input.
+    """
+    spec = spec.strip()
+    if not spec:
+        raise ValueError("No indices specified")
+
+    def resolve_index(idx_str: str, context: str = "") -> int:
+        """Parse and resolve a single index (handles negatives)."""
+        idx_str = idx_str.strip()
+        try:
+            idx = int(idx_str)
+        except ValueError:
+            raise ValueError(f"Invalid index: '{idx_str}'")
+
+        # Resolve negative indices
+        if idx < 0:
+            resolved = max_index + idx
+            if resolved < 0:
+                raise ValueError(f"Index {idx} out of range (-{max_index} to {max_index - 1})")
+            return resolved
+        else:
+            if idx >= max_index:
+                raise ValueError(f"Index {idx} out of range (0-{max_index - 1})")
+            return idx
+
     indices = []
+    seen = set()
+
     for part in spec.split(","):
         part = part.strip()
-        if "-" in part:
-            start, end = part.split("-")
-            indices.extend(range(int(start), int(end) + 1))
+
+        if not part:
+            raise ValueError("Empty index in specification")
+
+        if ".." in part:
+            # Range syntax
+            segments = part.split("..")
+            if len(segments) != 2:
+                raise ValueError(f"Invalid range syntax: '{part}'")
+
+            start_str, end_str = segments
+            start_str = start_str.strip()
+            end_str = end_str.strip()
+
+            # Handle open-ended ranges
+            if start_str == "":
+                start = 0
+            else:
+                start = resolve_index(start_str)
+
+            if end_str == "":
+                end = max_index - 1
+            else:
+                end = resolve_index(end_str)
+
+            # Check for inverted range
+            if start > end:
+                raise ValueError(f"Invalid range: {part.strip()} (start > end)")
+
+            # Add range indices, checking for duplicates
+            for i in range(start, end + 1):
+                if i in seen:
+                    raise ValueError(f"Duplicate index: {i}")
+                seen.add(i)
+                indices.append(i)
         else:
-            indices.append(int(part))
+            # Single index
+            idx = resolve_index(part)
+            if idx in seen:
+                raise ValueError(f"Duplicate index: {idx}")
+            seen.add(idx)
+            indices.append(idx)
 
-    # Validate all in range
-    for i in indices:
-        if i < 0 or i >= max_index:
-            raise ValueError(f"Index {i} out of range (0-{max_index - 1})")
-
-    return sorted(set(indices))  # Dedupe and sort
+    return sorted(indices)
 
 
 @click.command()

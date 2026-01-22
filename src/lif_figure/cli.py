@@ -114,6 +114,17 @@ def main(
         click.echo(f"Error: Not a LIF file: {input_file}", err=True)
         sys.exit(1)
 
+    # Validate and normalize zstack mode
+    valid_modes = ["max", "frames", "rows"]
+    mode_base = zstack.split(":")[0]  # Handle max:5-15 syntax
+    if mode_base == "row":
+        zstack = "rows"  # Accept "row" as alias
+        mode_base = "rows"
+    if mode_base not in valid_modes:
+        click.echo(f"Error: Invalid zstack mode: '{zstack}'", err=True)
+        click.echo(f"Valid modes: {', '.join(valid_modes)}, max:START-END", err=True)
+        sys.exit(1)
+
     # Parse channel names
     channel_names = [c.strip() for c in channels.split(",")]
 

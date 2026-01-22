@@ -182,3 +182,18 @@ class TestParseSeriesIndices:
         # -1 = 9, -3 = 7, so -1..-3 is 9..7 which is inverted
         with pytest.raises(ValueError, match=r"start > end"):
             parse_series_indices("-1..-3", 10)
+
+    def test_error_duplicate_single(self):
+        """Duplicate single index raises error."""
+        with pytest.raises(ValueError, match=r"Duplicate index: 1"):
+            parse_series_indices("1,1", 10)
+
+    def test_error_duplicate_from_range(self):
+        """Index appearing in range and separately raises error."""
+        with pytest.raises(ValueError, match=r"Duplicate index: 2"):
+            parse_series_indices("1..3,2", 10)
+
+    def test_error_overlapping_ranges(self):
+        """Overlapping ranges raise error."""
+        with pytest.raises(ValueError, match=r"Duplicate index"):
+            parse_series_indices("1..5,3..7", 10)

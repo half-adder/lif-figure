@@ -14,21 +14,31 @@ Generate publication-ready figure panels from Leica LIF microscopy files.
 
 ## Installation
 
+[uv](https://docs.astral.sh/uv/) is the recommended way to install and run lif-figure.
+
+### Run without installing
+
 ```bash
-pip install lif-figure
+uvx lif-figure input.lif --channels "DAPI,GFP,mCherry"
 ```
 
-Or for development:
+### Install as a tool
 
 ```bash
-git clone https://github.com/half-adder/lif-panel-maker.git
-cd lif-panel-maker
+uv tool install lif-figure
+lif-figure input.lif --channels "DAPI,GFP,mCherry"
+```
+
+### For development
+
+```bash
+git clone https://github.com/half-adder/lif-figure.git
+cd lif-figure
 uv sync
+uv run lif-figure input.lif --channels "DAPI,GFP,mCherry"
 ```
 
 ## Usage
-
-### Basic Usage
 
 ```bash
 lif-figure input.lif --channels "DAPI,GFP,mCherry"

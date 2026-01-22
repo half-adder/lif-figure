@@ -39,6 +39,14 @@ uv tool install git+https://github.com/half-adder/lif-figure
 lif-figure input.lif --channels "DAPI,GFP,mCherry"
 ```
 
+### Updating
+
+To get the latest version after installation:
+
+```bash
+uv tool upgrade lif-figure
+```
+
 ## Usage
 
 ```bash

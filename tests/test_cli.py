@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from click.testing import CliRunner
 
-from lif_figure.cli import main, sanitize_filename
+from lif_figure.cli import main, sanitize_filename, parse_series_indices
 
 
 def test_sanitize_filename():
@@ -42,3 +42,19 @@ def test_cli_help():
     assert "channels" in result.output
     assert "series" in result.output
     assert "zstack" in result.output
+
+
+class TestParseSeriesIndices:
+    """Tests for parse_series_indices function."""
+
+    def test_single_index(self):
+        """Single index returns list with that index."""
+        assert parse_series_indices("5", 10) == [5]
+
+    def test_single_zero(self):
+        """Index 0 is valid."""
+        assert parse_series_indices("0", 10) == [0]
+
+    def test_single_last_valid(self):
+        """Last valid index works."""
+        assert parse_series_indices("9", 10) == [9]

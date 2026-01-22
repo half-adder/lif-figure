@@ -14,6 +14,7 @@ class DetectorInfo:
     name: str
     mode: str  # "Std", "PC" (PhotonCounting), or "-" (PMT has no mode)
     gain: float
+    detector_type: str = "HyD"  # "HyD" or "PMT" - affects gain display (% vs V)
 
 
 @dataclass
@@ -159,8 +160,13 @@ def _extract_detectors(
         except ValueError:
             gain = 0.0
 
+        # Determine detector type
+        detector_type = "PMT" if name.startswith('PMT') else "HyD"
+
         # Store by channel (later entries overwrite, but they should be the same)
-        detectors_by_channel[channel] = DetectorInfo(name=name, mode=mode, gain=gain)
+        detectors_by_channel[channel] = DetectorInfo(
+            name=name, mode=mode, gain=gain, detector_type=detector_type
+        )
 
     # Determine which channels to include
     if active_channels:

@@ -293,7 +293,11 @@ def _add_metadata_table(
             det = metadata.detectors[i]
             det_name = det.name
             mode_str = det.mode
-            gain_str = f"{det.gain:.0f}%"
+            # PMT gain is in volts, HyD gain is percentage
+            if det.detector_type == "PMT":
+                gain_str = f"{det.gain:.0f}V"
+            else:
+                gain_str = f"{det.gain:.0f}%"
         else:
             det_name = "-"
             mode_str = "-"

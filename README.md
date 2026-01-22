@@ -46,6 +46,8 @@ lif-figure input.lif --channels "DAPI,GFP,mCherry"
 
 This processes all series in the LIF file and outputs PDF figures to `./figures/`.
 
+**Important:** All series in the LIF file are expected to contain the same channels in the same order. The `--channels` argument defines the labels applied to each channel by index (first name = channel 0, second = channel 1, etc.). Series with a different number of channels will be skipped.
+
 ### Options
 
 ```bash

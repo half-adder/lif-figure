@@ -58,3 +58,15 @@ class TestParseSeriesIndices:
     def test_single_last_valid(self):
         """Last valid index works."""
         assert parse_series_indices("9", 10) == [9]
+
+    def test_range_inclusive(self):
+        """Range N..M includes both endpoints."""
+        assert parse_series_indices("2..5", 10) == [2, 3, 4, 5]
+
+    def test_range_single_element(self):
+        """Range N..N returns single element."""
+        assert parse_series_indices("3..3", 10) == [3]
+
+    def test_range_full(self):
+        """Range covering all indices."""
+        assert parse_series_indices("0..9", 10) == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]

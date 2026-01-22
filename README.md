@@ -14,7 +14,17 @@ Generate publication-ready figure panels from Leica LIF microscopy files.
 
 ## Installation
 
-[uv](https://docs.astral.sh/uv/) is the recommended way to install and run lif-figure.
+### Prerequisites: Install uv
+
+lif-figure uses [uv](https://docs.astral.sh/uv/), a fast Python package manager that handles dependencies automatically. If you don't have uv installed, run:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Or see the [uv installation guide](https://docs.astral.sh/uv/getting-started/installation/) for other methods (Homebrew, Windows, etc.).
+
+**Why uv?** It automatically manages Python versions and dependencies, so you don't need to worry about virtual environments or package conflicts. Just run the commands below and everything works.
 
 ### Run without installing
 

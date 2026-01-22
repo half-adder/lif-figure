@@ -70,3 +70,31 @@ class TestParseSeriesIndices:
     def test_range_full(self):
         """Range covering all indices."""
         assert parse_series_indices("0..9", 10) == [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+    def test_negative_last(self):
+        """Negative -1 means last index."""
+        assert parse_series_indices("-1", 10) == [9]
+
+    def test_negative_third_from_end(self):
+        """Negative -3 means third from end."""
+        assert parse_series_indices("-3", 10) == [7]
+
+    def test_negative_range(self):
+        """Range with negative indices."""
+        assert parse_series_indices("-3..-1", 10) == [7, 8, 9]
+
+    def test_mixed_positive_negative_range(self):
+        """Range from positive to negative."""
+        assert parse_series_indices("5..-1", 10) == [5, 6, 7, 8, 9]
+
+    def test_multiple_singles(self):
+        """Comma-separated single indices."""
+        assert parse_series_indices("1,3,5", 10) == [1, 3, 5]
+
+    def test_mixed_singles_and_ranges(self):
+        """Mix of singles and ranges."""
+        assert parse_series_indices("0..2,5,8..", 10) == [0, 1, 2, 5, 8, 9]
+
+    def test_sorted_output(self):
+        """Output is always sorted."""
+        assert parse_series_indices("5,1,3", 10) == [1, 3, 5]

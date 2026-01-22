@@ -1,7 +1,6 @@
 """Tests for CLI module."""
 
 import pytest
-from pathlib import Path
 from click.testing import CliRunner
 
 from lif_figure.cli import main, sanitize_filename, parse_series_indices

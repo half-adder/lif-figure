@@ -132,7 +132,7 @@ def parse_series_indices(spec: str, max_index: int) -> list[int]:
 @click.option(
     "--series-index", "-si",
     default=None,
-    help="Series indices to process (0-indexed), comma-separated with ranges (e.g., '0-2,5,8-10')",
+    help="Series indices (0-indexed): single (5), range (2..5), negative (-1=last), open (3.., ..3). Comma-separated.",
 )
 @click.option(
     "--output", "-o",

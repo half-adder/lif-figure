@@ -171,3 +171,14 @@ class TestParseSeriesIndices:
         """Multiple .. in range raises error."""
         with pytest.raises(ValueError, match=r"Invalid range syntax: '1\.\.2\.\.3'"):
             parse_series_indices("1..2..3", 10)
+
+    def test_error_inverted_range(self):
+        """Inverted range raises error."""
+        with pytest.raises(ValueError, match=r"Invalid range: 5\.\.2 \(start > end\)"):
+            parse_series_indices("5..2", 10)
+
+    def test_error_inverted_after_resolution(self):
+        """Inverted range after negative resolution raises error."""
+        # -1 = 9, -3 = 7, so -1..-3 is 9..7 which is inverted
+        with pytest.raises(ValueError, match=r"start > end"):
+            parse_series_indices("-1..-3", 10)

@@ -181,9 +181,9 @@ def read_series(
     dims = info.get("dims")
     n_z = getattr(dims, "z", 1) if dims else 1
 
-    # Extract pixel size
+    # Extract pixel size (scale is in pixels/um, we need um/pixel)
     scale_info = info.get("scale", (None,))
-    pixel_size_um = scale_info[0] if scale_info and scale_info[0] else None
+    pixel_size_um = 1.0 / scale_info[0] if scale_info and scale_info[0] else None
 
     # Read all frames
     frames = []

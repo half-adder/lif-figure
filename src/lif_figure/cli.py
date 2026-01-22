@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 from lif_figure.config import load_config, DEFAULT_AUTO_CONTRAST_PERCENTILES
 from lif_figure.reader import list_series, read_series, extract_series_metadata, LifFile
-from lif_figure.figure import build_figure
+from lif_figure.figure import build_figure, compute_normalization_ranges
 
 
 def sanitize_filename(name: str) -> str:
@@ -61,6 +61,12 @@ def sanitize_filename(name: str) -> str:
     default=False,
     help="Hide acquisition metadata table from output",
 )
+@click.option(
+    "--per-slice-norm",
+    is_flag=True,
+    default=False,
+    help="Normalize each Z-slice independently (default: normalize across stack)",
+)
 def main(
     input_file: str,
     channels: str,
@@ -70,6 +76,7 @@ def main(
     config: Optional[str],
     auto_contrast: Optional[str],
     no_metadata: bool,
+    per_slice_norm: bool,
 ) -> None:
     """Generate publication-ready figure panels from LIF files.
 
@@ -183,10 +190,18 @@ def main(
                 subdir = output_path / sanitize_filename(series_name)
                 subdir.mkdir(exist_ok=True)
 
+                # Compute stack-wide normalization ranges (unless per-slice)
+                norm_ranges = None
+                if not per_slice_norm:
+                    norm_ranges = compute_normalization_ranges(
+                        data, cfg.auto_contrast_percentiles
+                    )
+
                 for z in range(data.shape[0]):
                     fig = build_figure(
                         data[z], channel_names, cfg, pixel_size_um,
-                        metadata=metadata, show_metadata=show_metadata
+                        metadata=metadata, show_metadata=show_metadata,
+                        normalization_ranges=norm_ranges,
                     )
                     output_file = subdir / f"z{z:02d}.pdf"
                     fig.savefig(output_file, format="pdf", bbox_inches="tight", facecolor=cfg.background)

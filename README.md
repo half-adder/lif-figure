@@ -69,12 +69,15 @@ lif-figure input.lif \
 | `--config` | | YAML config file path |
 | `--auto-contrast` | `-a` | Enable auto-contrast (optional: `LOW,HIGH` percentiles) |
 | `--no-metadata` | | Hide acquisition metadata table |
+| `--per-slice-norm` | | Normalize each Z-slice independently (default: across stack) |
 
 ### Z-Stack Modes
 
 - `max` - Maximum intensity projection across all Z slices
 - `max:5-15` - Max projection of Z slices 5 through 15
 - `frames` - Output each Z slice as a separate PDF
+
+When using `frames` mode, intensity normalization is computed across the entire Z-stack by default. This ensures consistent brightness across slices, allowing you to compare intensity between Z positions. Use `--per-slice-norm` if you want each slice normalized independently.
 
 ### Configuration File
 

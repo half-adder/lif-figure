@@ -29,6 +29,7 @@ COLOR_MAP = {
 def normalize_channel(
     data: np.ndarray,
     percentiles: Optional[tuple[float, float]] = None,
+    norm_range: Optional[tuple[float, float]] = None,
 ) -> np.ndarray:
     """Normalize channel data to 0-1 range.
 
@@ -37,13 +38,18 @@ def normalize_channel(
         percentiles: Optional (low, high) percentiles for auto-contrast.
                      If provided, clips to these percentiles before normalizing.
                      E.g., (0.1, 99.9) clips extreme 0.1% on each end.
+                     Ignored if norm_range is provided.
+        norm_range: Optional pre-computed (min, max) range for normalization.
+                    Use this for consistent normalization across Z-stacks.
 
     Returns:
         Normalized array with values in [0, 1]
     """
     data = data.astype(np.float64)
 
-    if percentiles is not None:
+    if norm_range is not None:
+        min_val, max_val = norm_range
+    elif percentiles is not None:
         min_val = np.percentile(data, percentiles[0])
         max_val = np.percentile(data, percentiles[1])
     else:
@@ -55,6 +61,35 @@ def normalize_channel(
 
     normalized = (data - min_val) / (max_val - min_val)
     return np.clip(normalized, 0, 1)
+
+
+def compute_normalization_ranges(
+    data: np.ndarray,
+    percentiles: Optional[tuple[float, float]] = None,
+) -> list[tuple[float, float]]:
+    """Compute normalization ranges across a Z-stack for each channel.
+
+    Args:
+        data: Array with shape (Z, C, H, W)
+        percentiles: Optional (low, high) percentiles for auto-contrast.
+
+    Returns:
+        List of (min, max) tuples, one per channel.
+    """
+    n_channels = data.shape[1]
+    ranges = []
+
+    for c in range(n_channels):
+        channel_data = data[:, c, :, :]  # All Z slices for this channel
+        if percentiles is not None:
+            min_val = np.percentile(channel_data, percentiles[0])
+            max_val = np.percentile(channel_data, percentiles[1])
+        else:
+            min_val = channel_data.min()
+            max_val = channel_data.max()
+        ranges.append((float(min_val), float(max_val)))
+
+    return ranges
 
 
 def apply_colormap(data: np.ndarray, color: str) -> np.ndarray:
@@ -126,6 +161,7 @@ def build_figure(
     pixel_size_um: Optional[float] = None,
     metadata: Optional["SeriesMetadata"] = None,
     show_metadata: bool = True,
+    normalization_ranges: Optional[list[tuple[float, float]]] = None,
 ) -> Figure:
     """Build a figure with channel panels and merge.
 
@@ -136,6 +172,8 @@ def build_figure(
         pixel_size_um: Optional pixel size for scale bar
         metadata: Optional series metadata for table
         show_metadata: Whether to show metadata table (default True)
+        normalization_ranges: Optional pre-computed (min, max) per channel.
+                              Use for consistent normalization across Z-stacks.
 
     Returns:
         Matplotlib Figure object
@@ -144,10 +182,12 @@ def build_figure(
     n_panels = n_channels + 1  # channels + merge
 
     # Normalize all channels
-    normalized = [
-        normalize_channel(channels[i], config.auto_contrast_percentiles)
-        for i in range(n_channels)
-    ]
+    normalized = []
+    for i in range(n_channels):
+        norm_range = normalization_ranges[i] if normalization_ranges else None
+        normalized.append(
+            normalize_channel(channels[i], config.auto_contrast_percentiles, norm_range)
+        )
 
     # Apply colors
     colors = [config.get_color(names[i], i) for i in range(n_channels)]

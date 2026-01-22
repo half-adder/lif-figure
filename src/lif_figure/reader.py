@@ -178,8 +178,8 @@ def read_series(
     image = lif.get_image(series_idx)
 
     n_channels = info.get("channels", 1)
-    dims = info.get("dims", {})
-    n_z = dims.get("z", 1) if isinstance(dims, dict) else 1
+    dims = info.get("dims")
+    n_z = getattr(dims, "z", 1) if dims else 1
 
     # Extract pixel size
     scale_info = info.get("scale", (None,))

@@ -126,3 +126,48 @@ class TestParseSeriesIndices:
     def test_open_negative_start(self):
         """-3.. means third-from-end through last."""
         assert parse_series_indices("-3..", 10) == [7, 8, 9]
+
+    def test_error_out_of_bounds_positive(self):
+        """Index >= max_index raises error."""
+        with pytest.raises(ValueError, match=r"Index 15 out of range \(0-9\)"):
+            parse_series_indices("15", 10)
+
+    def test_error_out_of_bounds_negative(self):
+        """Negative index too large raises error."""
+        with pytest.raises(ValueError, match=r"Index -20 out of range \(-10 to 9\)"):
+            parse_series_indices("-20", 10)
+
+    def test_error_range_end_out_of_bounds(self):
+        """Range end out of bounds raises error."""
+        with pytest.raises(ValueError, match=r"out of range"):
+            parse_series_indices("5..15", 10)
+
+    def test_error_empty_string(self):
+        """Empty string raises error."""
+        with pytest.raises(ValueError, match=r"No indices specified"):
+            parse_series_indices("", 10)
+
+    def test_error_empty_part(self):
+        """Empty part between commas raises error."""
+        with pytest.raises(ValueError, match=r"Empty index in specification"):
+            parse_series_indices("1,,3", 10)
+
+    def test_error_leading_comma(self):
+        """Leading comma raises error."""
+        with pytest.raises(ValueError, match=r"Empty index in specification"):
+            parse_series_indices(",1,3", 10)
+
+    def test_error_non_numeric(self):
+        """Non-numeric value raises error."""
+        with pytest.raises(ValueError, match=r"Invalid index: 'foo'"):
+            parse_series_indices("foo", 10)
+
+    def test_error_float(self):
+        """Float value raises error."""
+        with pytest.raises(ValueError, match=r"Invalid index: '1\.5'"):
+            parse_series_indices("1.5", 10)
+
+    def test_error_malformed_range(self):
+        """Multiple .. in range raises error."""
+        with pytest.raises(ValueError, match=r"Invalid range syntax: '1\.\.2\.\.3'"):
+            parse_series_indices("1..2..3", 10)

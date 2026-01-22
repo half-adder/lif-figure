@@ -1,117 +1,97 @@
-# napari-figure-maker
+# lif-figure
 
-Create publication-ready multichannel figure panels from microscopy images in napari.
+Generate publication-ready figure panels from Leica LIF microscopy files.
 
 ## Features
 
-- **Multichannel Figure Panels**: Arrange fluorescence channels side-by-side with merge
-- **Automatic Scale Bars**: Calculate and render scale bars with nice round numbers
-- **Channel Labels**: Add customizable labels to each panel
-- **Colormap Support**: Built-in colormaps (gray, red, green, blue, cyan, magenta, yellow)
-- **Preset System**: Save and load figure configurations
-- **LIF File Support**: Read Leica LIF files directly into napari
-- **Export Options**: Save figures as PNG or TIFF with proper DPI
+- **Multichannel Figure Panels**: Grayscale channel panels with color merge
+- **Automatic Scale Bars**: Calculated from LIF metadata with nice round numbers
+- **Channel Labels**: Customizable labels for each panel
+- **Z-Stack Support**: Max projection, individual frames, or range selection
+- **Auto-Contrast**: Optional percentile-based intensity normalization
+- **Metadata Table**: Acquisition parameters displayed below figures
+- **PDF Output**: Vector graphics suitable for publication
 
 ## Installation
 
 ```bash
-pip install napari-figure-maker
+pip install lif-figure
 ```
 
 Or for development:
 
 ```bash
-git clone https://github.com/yourusername/napari-figure-maker.git
-cd napari-figure-maker
-uv sync --all-extras
+git clone https://github.com/half-adder/lif-panel-maker.git
+cd lif-panel-maker
+uv sync
 ```
 
 ## Usage
 
-### In napari
+### Basic Usage
 
-1. Open napari and load your image layers
-2. Open the Figure Maker widget: `Plugins > Figure Maker`
-3. Select channels from the list
-4. Configure options (merge, DPI, background color)
-5. Click "Export Figure..." to save
-
-### Programmatic Usage
-
-```python
-import numpy as np
-from napari_figure_maker.models import ChannelConfig, FigureConfig
-from napari_figure_maker.figure_builder import build_figure
-from napari_figure_maker.exporter import export_figure
-
-# Your channel data
-dapi = np.random.randint(0, 255, (512, 512), dtype=np.uint8)
-gfp = np.random.randint(0, 255, (512, 512), dtype=np.uint8)
-
-# Configure channels
-channel_configs = [
-    ChannelConfig(name="DAPI", colormap="blue", label="Nuclei"),
-    ChannelConfig(name="GFP", colormap="green", label="GFP"),
-]
-
-# Configure figure
-figure_config = FigureConfig(
-    dpi=300,
-    show_merge=True,
-    panel_gap_fraction=0.02,
-    background_color="black",
-)
-
-# Build and export
-figure = build_figure(
-    channels_data=[dapi, gfp],
-    channel_configs=channel_configs,
-    figure_config=figure_config,
-    pixel_size_um=0.5,  # For scale bar
-)
-
-export_figure(figure, "my_figure.png", dpi=300)
+```bash
+lif-figure input.lif --channels "DAPI,GFP,mCherry"
 ```
 
-### Using Presets
+This processes all series in the LIF file and outputs PDF figures to `./figures/`.
 
-```python
-from napari_figure_maker.presets import save_preset, load_preset
+### Options
 
-# Save your configuration
-save_preset(
-    path="my_preset.yaml",
-    name="Standard 2-Channel",
-    channel_configs=channel_configs,
-    figure_config=figure_config,
-)
-
-# Load it later
-name, channels, figure = load_preset("my_preset.yaml")
+```bash
+lif-figure input.lif \
+    --channels "DAPI,GFP,mCherry" \
+    --series "Image1,Image2" \
+    --output ./output \
+    --zstack max \
+    --auto-contrast \
+    --config lif-figure.yaml
 ```
 
-## Configuration Options
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--channels` | `-c` | Channel names, comma-separated (required) |
+| `--series` | `-s` | Series to process, comma-separated (default: all) |
+| `--output` | `-o` | Output directory (default: `./figures`) |
+| `--zstack` | `-z` | Z-stack mode: `max`, `max:START-END`, `frames` (default: `max`) |
+| `--config` | | YAML config file path |
+| `--auto-contrast` | `-a` | Enable auto-contrast (optional: `LOW,HIGH` percentiles) |
+| `--no-metadata` | | Hide acquisition metadata table |
 
-### ChannelConfig
+### Z-Stack Modes
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| name | str | required | Channel identifier |
-| visible | bool | True | Include in figure |
-| label | str | None | Display label (uses name if None) |
-| colormap | str | "gray" | Color lookup table |
+- `max` - Maximum intensity projection across all Z slices
+- `max:5-15` - Max projection of Z slices 5 through 15
+- `frames` - Output each Z slice as a separate PDF
 
-### FigureConfig
+### Configuration File
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| dpi | int | 300 | Export resolution |
-| panel_gap_fraction | float | 0.02 | Gap as fraction of panel width |
-| background_color | str | "black" | Gap/background color |
-| show_merge | bool | True | Include merge panel |
-| scale_bar_color | str | "white" | Scale bar color |
-| label_font_size | int | 12 | Channel label font size |
-| label_position | str | "top-left" | Label placement |
+Create `lif-figure.yaml` in your working directory (auto-detected) or specify with `--config`:
+
+```yaml
+# Channel color overrides
+colors:
+  DAPI: blue
+  GFP: green
+  mCherry: red
+
+# Figure settings
+dpi: 300
+font_size: 12
+scale_bar_height: 4
+background: black
+
+# Auto-contrast percentiles (optional)
+auto_contrast_percentiles: [0.1, 99.9]
+```
+
+## Output
+
+Each series produces a PDF with:
+- Individual grayscale panels for each channel (labeled)
+- Color merge panel
+- Scale bar with measurement
+- Acquisition metadata table (optional)
 
 ## License
 

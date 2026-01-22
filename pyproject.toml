@@ -3,22 +3,17 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "napari-figure-maker"
+name = "lif-figure"
 version = "0.1.0"
-description = "Create publication-ready multichannel figure panels from microscopy images"
+description = "Generate publication-ready figure panels from Leica LIF microscopy files"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-classifiers = [
-    "Framework :: napari",
-]
 dependencies = [
-    "napari>=0.4.18",
     "numpy",
     "pillow",
     "pyyaml",
     "readlif",
-    "qtpy",
     "click>=8.0",
     "matplotlib>=3.5",
 ]
@@ -26,21 +21,15 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest",
-    "pytest-qt",
 ]
-
-[project.entry-points."napari.manifest"]
-napari-figure-maker = "napari_figure_maker:napari.yaml"
 
 [project.scripts]
 lif-figure = "lif_figure.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/napari_figure_maker", "src/lif_figure"]
+packages = ["src/lif_figure"]
 
 [dependency-groups]
 dev = [
-    "pyqt6>=6.10.2",
     "pytest>=9.0.2",
-    "pytest-qt>=4.5.0",
 ]

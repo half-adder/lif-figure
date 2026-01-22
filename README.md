@@ -76,8 +76,9 @@ lif-figure input.lif \
 - `max` - Maximum intensity projection across all Z slices
 - `max:5-15` - Max projection of Z slices 5 through 15
 - `frames` - Output each Z slice as a separate PDF
+- `rows` - All Z slices as rows in a single PDF (with Z-position labels)
 
-When using `frames` mode, intensity normalization is computed across the entire Z-stack by default. This ensures consistent brightness across slices, allowing you to compare intensity between Z positions. Use `--per-slice-norm` if you want each slice normalized independently.
+When using `frames` or `rows` mode, intensity normalization is computed across the entire Z-stack by default. This ensures consistent brightness across slices, allowing you to compare intensity between Z positions. Use `--per-slice-norm` if you want each slice normalized independently.
 
 ### Configuration File
 

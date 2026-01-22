@@ -342,3 +342,165 @@ def _add_scale_bar(ax, scale_bar_info: tuple[int, str], config: Config) -> None:
         fontsize=config.font_size - 2,
         color=bar_color,
     )
+
+
+def build_rows_figure(
+    data: np.ndarray,
+    names: list[str],
+    config: Config,
+    pixel_size_um: Optional[float] = None,
+    z_pixel_size_um: Optional[float] = None,
+    metadata: Optional["SeriesMetadata"] = None,
+    show_metadata: bool = True,
+    normalization_ranges: Optional[list[tuple[float, float]]] = None,
+) -> Figure:
+    """Build a figure with Z-slices as rows.
+
+    Args:
+        data: Array with shape (Z, C, H, W)
+        names: List of channel names
+        config: Configuration object
+        pixel_size_um: Optional XY pixel size for scale bar
+        z_pixel_size_um: Optional Z step size for position labels
+        metadata: Optional series metadata for table
+        show_metadata: Whether to show metadata table (default True)
+        normalization_ranges: Optional pre-computed (min, max) per channel.
+
+    Returns:
+        Matplotlib Figure object
+    """
+    n_z = data.shape[0]
+    n_channels = data.shape[1]
+    n_cols = n_channels + 1  # channels + merge
+
+    text_color = "white" if config.background == "black" else "black"
+
+    # Figure layout
+    panel_size = 2  # inches per panel
+    should_show_table = show_metadata and metadata is not None
+    header_ratio = 0.08  # For column titles
+
+    if should_show_table:
+        # Add extra height for header row and metadata table
+        table_height_inches = 1.5  # Fixed height for table area
+        fig_height = (n_z + header_ratio) * panel_size + table_height_inches + 0.5
+        fig = plt.figure(figsize=(n_cols * panel_size + 1.2, fig_height), dpi=config.dpi)
+        # Height ratios: header, Z rows (no table in gridspec)
+        height_ratios = [header_ratio] + [1] * n_z
+        gs = GridSpec(
+            n_z + 1, n_cols + 1,  # +1 header, +1 col for Z labels
+            figure=fig,
+            height_ratios=height_ratios,
+            width_ratios=[0.25] + [1] * n_cols,
+            hspace=0.02,
+            wspace=0.02,
+            bottom=table_height_inches / fig_height + 0.02,  # Reserve space at bottom
+        )
+        # Create table axes separately at the bottom
+        table_ax = fig.add_axes([0.15, 0.02, 0.8, table_height_inches / fig_height - 0.02])
+    else:
+        fig_height = (n_z + header_ratio) * panel_size
+        fig = plt.figure(figsize=(n_cols * panel_size + 1.2, fig_height), dpi=config.dpi)
+        height_ratios = [header_ratio] + [1] * n_z
+        gs = GridSpec(
+            n_z + 1, n_cols + 1,  # +1 row for header, +1 col for Z labels
+            figure=fig,
+            height_ratios=height_ratios,
+            width_ratios=[0.25] + [1] * n_cols,
+            hspace=0.02,
+            wspace=0.02,
+        )
+        table_ax = None
+
+    # Add column headers in the header row
+    for c, name in enumerate(names):
+        header_ax = fig.add_subplot(gs[0, c + 1])
+        header_ax.axis("off")
+        header_ax.set_facecolor(config.background)
+        header_ax.text(
+            0.5, 0.5, name,
+            ha="center", va="center",
+            fontsize=config.font_size,
+            color=text_color,
+            transform=header_ax.transAxes,
+        )
+    # Merge header
+    merge_header_ax = fig.add_subplot(gs[0, n_cols])
+    merge_header_ax.axis("off")
+    merge_header_ax.set_facecolor(config.background)
+    merge_header_ax.text(
+        0.5, 0.5, "Merge",
+        ha="center", va="center",
+        fontsize=config.font_size,
+        color=text_color,
+        transform=merge_header_ax.transAxes,
+    )
+
+    fig.patch.set_facecolor(config.background)
+
+    # Calculate scale bar
+    scale_bar_info = None
+    if pixel_size_um is not None:
+        scale_bar_info = calculate_scale_bar(pixel_size_um, data.shape[3])
+
+    # Get colors for channels
+    colors = [config.get_color(names[i], i) for i in range(n_channels)]
+
+    # Process each Z-slice (row) - offset by 1 for header row
+    for z in range(n_z):
+        row_idx = z + 1  # Offset for header row
+
+        # Normalize channels for this slice
+        normalized = []
+        for c in range(n_channels):
+            norm_range = normalization_ranges[c] if normalization_ranges else None
+            normalized.append(
+                normalize_channel(data[z, c], config.auto_contrast_percentiles, norm_range)
+            )
+
+        # Apply colors and create merge
+        colored = [apply_colormap(normalized[c], colors[c]) for c in range(n_channels)]
+        merge = create_merge(colored)
+
+        # Z-position label (leftmost column)
+        z_label_ax = fig.add_subplot(gs[row_idx, 0])
+        z_label_ax.axis("off")
+        z_label_ax.set_facecolor(config.background)
+
+        # Calculate Z position in microns if available
+        if z_pixel_size_um is not None:
+            z_pos = z * z_pixel_size_um
+            z_text = f"z={z_pos:.1f}µm"
+        else:
+            z_text = f"z={z}"
+
+        z_label_ax.text(
+            0.9, 0.5, z_text,
+            ha="right", va="center",
+            fontsize=config.font_size - 2,
+            color=text_color,
+            transform=z_label_ax.transAxes,
+        )
+
+        # Plot channels
+        for c in range(n_channels):
+            ax = fig.add_subplot(gs[row_idx, c + 1])
+            ax.imshow(normalized[c], cmap="gray", vmin=0, vmax=1)
+            ax.axis("off")
+            ax.set_facecolor(config.background)
+
+        # Plot merge
+        ax_merge = fig.add_subplot(gs[row_idx, n_cols])
+        ax_merge.imshow(merge)
+        ax_merge.axis("off")
+        ax_merge.set_facecolor(config.background)
+
+        # Scale bar on bottom-right merge panel only
+        if z == n_z - 1 and scale_bar_info:
+            _add_scale_bar(ax_merge, scale_bar_info, config)
+
+    # Add metadata table
+    if should_show_table and table_ax is not None:
+        _add_metadata_table(table_ax, names, metadata, config)
+
+    return fig

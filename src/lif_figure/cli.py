@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 from lif_figure.config import load_config, DEFAULT_AUTO_CONTRAST_PERCENTILES
 from lif_figure.reader import list_series, read_series, extract_series_metadata, LifFile
-from lif_figure.figure import build_figure, compute_normalization_ranges
+from lif_figure.figure import build_figure, build_rows_figure, compute_normalization_ranges
 
 
 def sanitize_filename(name: str) -> str:
@@ -153,7 +153,7 @@ def main(
         click.echo(f"  Series {i} of {len(series_names)}: \"{series_name}\"", nl=False)
 
         try:
-            data, pixel_size_um = read_series(input_path, series_name, zstack)
+            data, pixel_size_um, z_pixel_size_um = read_series(input_path, series_name, zstack)
 
             # Extract metadata if needed
             metadata = None
@@ -211,9 +211,25 @@ def main(
 
             elif zstack == "rows":
                 # All Z frames as rows in single PDF
-                # TODO: Implement multi-row figure
-                click.echo(" [SKIP: rows mode not yet implemented]")
-                continue
+                norm_ranges = None
+                if not per_slice_norm:
+                    norm_ranges = compute_normalization_ranges(
+                        data, cfg.auto_contrast_percentiles
+                    )
+
+                fig = build_rows_figure(
+                    data, channel_names, cfg, pixel_size_um,
+                    z_pixel_size_um=z_pixel_size_um,
+                    metadata=metadata, show_metadata=show_metadata,
+                    normalization_ranges=norm_ranges,
+                )
+
+                safe_name = sanitize_filename(series_name)
+                output_file = output_path / f"{safe_name}.pdf"
+                fig.savefig(output_file, format="pdf", bbox_inches="tight", facecolor=cfg.background)
+                plt.close(fig)
+
+                click.echo(f" → {output_file} ({data.shape[0]} rows)")
 
         except Exception as e:
             click.echo(f" [ERROR: {e}]")

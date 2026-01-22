@@ -148,7 +148,7 @@ def read_series(
     path: Path,
     series_name: str,
     zstack_mode: str = "max",
-) -> tuple[np.ndarray, Optional[float]]:
+) -> tuple[np.ndarray, Optional[float], Optional[float]]:
     """Read a single series from a LIF file.
 
     Args:
@@ -157,7 +157,7 @@ def read_series(
         zstack_mode: Z-stack handling mode
 
     Returns:
-        Tuple of (channels_array, pixel_size_um)
+        Tuple of (channels_array, pixel_size_um, z_pixel_size_um)
         channels_array has shape (C, H, W) for max projection
         or (Z, C, H, W) for frames/rows modes
     """
@@ -182,8 +182,9 @@ def read_series(
     n_z = getattr(dims, "z", 1) if dims else 1
 
     # Extract pixel size (scale is in pixels/um, we need um/pixel)
-    scale_info = info.get("scale", (None,))
+    scale_info = info.get("scale", (None, None, None))
     pixel_size_um = 1.0 / scale_info[0] if scale_info and scale_info[0] else None
+    z_pixel_size_um = 1.0 / scale_info[2] if scale_info and len(scale_info) > 2 and scale_info[2] else None
 
     # Read all frames
     frames = []
@@ -213,4 +214,4 @@ def read_series(
         data = apply_max_projection(data, z_range)
     # For 'frames' and 'rows', keep full (Z, C, H, W) shape
 
-    return data, pixel_size_um
+    return data, pixel_size_um, z_pixel_size_um

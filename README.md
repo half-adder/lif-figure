@@ -105,6 +105,36 @@ Each series produces a PDF with:
 - Scale bar with measurement
 - Acquisition metadata table (optional)
 
+## Development
+
+### Setup
+
+```bash
+git clone https://github.com/half-adder/lif-figure.git
+cd lif-figure
+uv sync --group dev
+```
+
+### Running tests
+
+```bash
+uv run python -m pytest
+```
+
+### Linting and formatting
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
+
+```bash
+uv run ruff check .        # Check for lint errors
+uv run ruff check --fix .  # Auto-fix lint errors
+uv run ruff format .       # Format code
+```
+
+### VS Code
+
+For the best development experience, install the [Ruff extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff). The project includes `.vscode/settings.json` which enables format-on-save.
+
 ## License
 
 MIT

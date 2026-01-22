@@ -98,3 +98,15 @@ class TestParseSeriesIndices:
     def test_sorted_output(self):
         """Output is always sorted."""
         assert parse_series_indices("5,1,3", 10) == [1, 3, 5]
+
+    def test_whitespace_around_commas(self):
+        """Whitespace around commas is stripped."""
+        assert parse_series_indices("1 , 3 , 5", 10) == [1, 3, 5]
+
+    def test_whitespace_around_dots(self):
+        """Whitespace around .. is stripped."""
+        assert parse_series_indices("1 .. 3", 10) == [1, 2, 3]
+
+    def test_leading_trailing_whitespace(self):
+        """Leading/trailing whitespace stripped."""
+        assert parse_series_indices("  2..4  ", 10) == [2, 3, 4]

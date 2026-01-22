@@ -23,9 +23,17 @@ def test_widget_has_export_button(qtbot):
     assert hasattr(widget, "export_btn")
 
 
-def test_widget_has_channel_list(qtbot):
-    """Widget should have a channel list."""
+def test_widget_has_layer_combo(qtbot):
+    """Widget should have a layer selection dropdown."""
     widget = FigureMakerWidget(napari_viewer=None)
     qtbot.addWidget(widget)
 
-    assert hasattr(widget, "channel_list")
+    assert hasattr(widget, "layer_combo")
+
+
+def test_widget_has_channel_table(qtbot):
+    """Widget should have a channel configuration table."""
+    widget = FigureMakerWidget(napari_viewer=None)
+    qtbot.addWidget(widget)
+
+    assert hasattr(widget, "channel_table")

@@ -120,6 +120,10 @@ Each series produces a PDF with:
 - Scale bar with measurement
 - Acquisition metadata table (optional)
 
+> **Warning: Verify Metadata Accuracy**
+>
+> The acquisition metadata (objective, zoom, pixel size, etc.) is extracted from Leica's proprietary LIF format, which stores information in a complex and poorly documented XML structure. While we attempt to parse this correctly, **values may be inaccurate or misinterpreted**. Always verify critical measurements against your microscope's settings before publication.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and code style.
